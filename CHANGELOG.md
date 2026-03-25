@@ -11,6 +11,12 @@ Updated on every merge to `main`.
 
 ## [Unreleased] — dev branch
 
+_Nothing unreleased yet._
+
+---
+
+## [0.1.0] — 2026-03-25
+
 ### Added
 - Full Phase 1 Core Engine implementation
   - `POST /auth/login` — email/wallet login, 201 new user / 200 returning user (SPEC-001, SPEC-002)
@@ -40,12 +46,6 @@ Updated on every merge to `main`.
 - No 32-byte hex key pattern in any auth response (SPEC-007)
 - Oversized payload returns 413 (SPEC-201)
 - Security test suite runs in CI on every push
-
----
-
-## [0.1.0] — TBD (first main release)
-
-_Pending CI green on dev branch + PR review._
 
 ---
 
