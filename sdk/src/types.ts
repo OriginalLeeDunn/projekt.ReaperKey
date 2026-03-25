@@ -53,6 +53,13 @@ export interface SessionKeyResponse {
   expiresAt: string
 }
 
+export interface RecoveryResult {
+  recoveryId: string
+  method: string
+  status: string
+  instructions: string
+}
+
 // Error types — never throw raw Error strings
 export type GhostKeyErrorCode =
   | 'not_authenticated'
