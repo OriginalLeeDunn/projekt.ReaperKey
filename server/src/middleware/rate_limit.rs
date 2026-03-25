@@ -1,19 +1,20 @@
 use dashmap::DashMap;
+use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
-/// Simple in-memory sliding-window rate limiter.
+/// Sliding-window in-memory rate limiter.
 /// Keyed by arbitrary string (e.g. "login:{ip}").
 pub struct RateLimiter {
-    state: DashMap<String, (u32, Instant)>,
-    max_requests: u32,
+    requests: DashMap<String, VecDeque<Instant>>,
+    limit: u32,
     window: Duration,
 }
 
 impl RateLimiter {
-    pub fn new(max_requests: u32, window_secs: u64) -> Self {
+    pub fn new(limit: u32, window_secs: u64) -> Self {
         Self {
-            state: DashMap::new(),
-            max_requests,
+            requests: DashMap::new(),
+            limit,
             window: Duration::from_secs(window_secs),
         }
     }
@@ -21,18 +22,19 @@ impl RateLimiter {
     /// Returns `true` if the request is allowed, `false` if rate limited.
     pub fn check(&self, key: &str) -> bool {
         let now = Instant::now();
-        let mut entry = self.state.entry(key.to_string()).or_insert((0, now));
-
-        if now.duration_since(entry.1) > self.window {
-            *entry = (1, now);
-            return true;
+        let mut deque = self.requests.entry(key.to_string()).or_default();
+        // Remove entries outside the window
+        while let Some(&front) = deque.front() {
+            if now.duration_since(front) > self.window {
+                deque.pop_front();
+            } else {
+                break;
+            }
         }
-
-        if entry.0 >= self.max_requests {
+        if deque.len() as u32 >= self.limit {
             return false;
         }
-
-        entry.0 += 1;
+        deque.push_back(now);
         true
     }
 }
