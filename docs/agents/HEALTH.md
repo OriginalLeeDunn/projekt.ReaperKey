@@ -1,30 +1,30 @@
 # GhostKey — System Health Dashboard
 
 **Maintained by:** Governor Agent
-**Last Updated:** 2026-03-24
-**Next Scheduled Assessment:** 2026-03-31
+**Last Updated:** 2026-03-25
+**Next Scheduled Assessment:** 2026-04-01
 
 ---
 
 ## Current System State
 
 ```
-OVERALL: HEALTHY — Phase 1 IN PROGRESS — dev branch active
+OVERALL: HEALTHY — Phase 1 COMPLETE — v0.1.0 on main
 ──────────────────────────────────────────────────────────
 AGENT CORP:        ✓ 18 agents defined
-DOCS CURRENCY:     ✓ All docs fresh (updated 2026-03-24)
-DRIFT FINDINGS:    ✓ 0 open (ISS-001/002/003 resolved same session)
+DOCS CURRENCY:     ✓ All docs fresh (updated 2026-03-25)
+DRIFT FINDINGS:    ✓ 0 open
 SECURITY FINDINGS: ✓ 0 open
-PHASE PROGRESS:    Phase 1 IN PROGRESS (core routes implemented, tests passing)
+PHASE PROGRESS:    Phase 1 COMPLETE — merged to main as v0.1.0 (2026-03-25)
 REPO:              ✓ Public on GitHub — OriginalLeeDunn/projekt.ReaperKey
-BRANCHES:          ✓ main (stable) + dev (active)
-CI:                ✓ Pipeline active — runs on dev + PRs to main
-TESTS PASSING:     ✓ 8 / 8 active (5 auth + 3 security)
-TESTS IGNORED:     4 (account — pending auth wiring, ISS-003)
-COVERAGE:          Partial — tarpaulin gates active in CI
-README:            ✓ Created
-CHANGELOG:         ✓ Created
-DEPLOYMENTS LOG:   ✓ Created (DEPLOYMENTS.md)
+BRANCHES:          ✓ main (v0.1.0) + dev (synced)
+CI:                ✓ All green — rust + sdk + security + coverage (72.6%)
+TESTS PASSING:     ✓ 16 Rust + 3 SDK = 19 total
+TESTS IGNORED:     0
+COVERAGE:          72.6% Rust (gate: 70%) — GH #8 tracks path to 80%
+README:            ✓ Live
+CHANGELOG:         ✓ v0.1.0 published
+DEPLOYMENTS LOG:   ✓ Deployment #1 recorded
 ```
 
 ---
@@ -97,7 +97,7 @@ DEPLOYMENTS LOG:   ✓ Created (DEPLOYMENTS.md)
 | Phase                        | Status       | Lead Agent    | Blocking Issues |
 |------------------------------|--------------|---------------|-----------------|
 | Phase 0: Alignment           | ✓ COMPLETE   | Orchestrator  | None            |
-| Phase 1: Core Engine         | IN PROGRESS  | Backend Eng   | ISS-003 (account tests)|
+| Phase 1: Core Engine         | ✓ COMPLETE   | Backend Eng   | None — all ISS resolved |
 | Phase 2: SDK                 | NOT STARTED  | SDK Eng       | Awaiting P1     |
 | Phase 3: Reference App       | NOT STARTED  | SDK Eng       | Awaiting P2     |
 | Phase 4: Hardening           | NOT STARTED  | Security Lead | Awaiting P3     |
@@ -117,8 +117,15 @@ DEPLOYMENTS LOG:   ✓ Created (DEPLOYMENTS.md)
 - [x] Phase 1 route handlers implemented (auth, account, session_key, intent, recovery)
 - [x] Auth test suite passing (SPEC-001, 002, 003, 005, 007)
 - [x] Security test suite passing (SPEC-200, 201, 203)
-- [x] CI pipeline live on dev + main
+- [x] Account tests passing (3/3) — Bearer auth wired
+- [x] Session key tests passing (3/3) — SPEC-020 through SPEC-023
+- [x] Recovery tests passing (2/2) — SPEC-040
+- [x] TypeScript SDK tests passing (3 client smoke tests)
+- [x] Coverage gate: 72.6% ≥ 70% threshold
+- [x] CI pipeline live on dev + main (all green)
 - [x] README.md, CHANGELOG.md, DEPLOYMENTS.md created
+- [x] v0.1.0 tagged and merged to main (commit a8c6924)
+- [x] Deployment #1 recorded in DEPLOYMENTS.md
 
 ---
 
@@ -134,7 +141,7 @@ DEPLOYMENTS LOG:   ✓ Created (DEPLOYMENTS.md)
 
 ## Security Findings
 
-_No findings. No code yet._
+_No open findings. RUSTSEC-2023-0071 (rsa Marvin Attack) documented and ignored in `.cargo/audit.toml` — unreachable via SQLite-only usage. See DECISIONS.md._
 
 ---
 
@@ -160,6 +167,27 @@ _No findings. No code yet._
 
 ---
 
+### 2026-03-25 — Monitor Agent — Phase 1 Completion / Post-Deploy Assessment
+
+**Triggered by:** PR #9 merge to main, v0.1.0 tag + push.
+
+**Phase 1 status:** COMPLETE. All routes implemented and tested. All CI jobs green.
+**Deployment #1:** a8c6924 — 19 tests passing (16 Rust + 3 SDK). Coverage 72.6% (gate 70%).
+**All prior issues resolved:** ISS-001 (package-lock.json), ISS-002 (unused import), ISS-003 (Bearer auth wiring).
+**Open GH Issues:** #8 (path to 80% coverage — intent tests require mock chain adapter, Phase 2 work).
+**Security:** RUSTSEC-2023-0071 documented ignore — unreachable via SQLite-only usage.
+**Agent system:** Hard Rules #10/#11 active. ci-issue.yml live — auto-opens GH Issues on CI failure.
+**Lessons encoded:** cargo fmt Hard Rule, GitHub Issues as single source of truth both in AGENTS.md + TOOLS.md.
+
+**Readiness for Phase 2:**
+- SDK Engineer: TypeScript SDK skeleton exists, 3 client tests passing, ESLint clean.
+- Phase 2 scope: full SDK implementation, React hooks tested, reference app.
+- Blocking: none. Dev branch ready for Phase 2 feature work.
+
+**Overall: PHASE 1 COMPLETE. HEALTHY. READY FOR PHASE 2.**
+
+---
+
 ## Governance Change Log
 
 | Date       | Change                                         | By              |
@@ -176,3 +204,12 @@ _No findings. No code yet._
 | 2026-03-24 | README, CHANGELOG, DEPLOYMENTS.md created       | Docs Agent      |
 | 2026-03-24 | CI trigger fixed (now fires on dev push)        | DevOps Agent    |
 | 2026-03-24 | 3 drift findings logged (ISS-001 through 003)   | Monitor Agent   |
+| 2026-03-24 | ISS-001/002/003 resolved same session           | Backend/DevOps  |
+| 2026-03-24 | Session key + recovery tests written            | QA Agent        |
+| 2026-03-24 | Coverage gate set to 70% (tarpaulin.toml)       | DevOps Agent    |
+| 2026-03-24 | cargo audit ignore RUSTSEC-2023-0071 documented | Dep Scanner     |
+| 2026-03-24 | Pre-commit hook + Hard Rules #10/#11 added      | DevOps Agent    |
+| 2026-03-24 | ci-issue.yml — auto GitHub Issues on CI failure | Monitor Agent   |
+| 2026-03-25 | PR #9 merged — Phase 1 COMPLETE on main         | Orchestrator    |
+| 2026-03-25 | v0.1.0 tagged (commit a8c6924)                  | DevOps Agent    |
+| 2026-03-25 | Deployment #1 recorded in DEPLOYMENTS.md        | Monitor Agent   |
