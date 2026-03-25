@@ -32,7 +32,10 @@ async fn recovery_initiate_returns_202() {
 
     // Must never leak a private key
     let re = regex::Regex::new(r"0x[0-9a-fA-F]{64}").unwrap();
-    assert!(!re.is_match(&res.text()), "private key pattern in recovery response");
+    assert!(
+        !re.is_match(&res.text()),
+        "private key pattern in recovery response"
+    );
 }
 
 // Recovery for unknown address returns 404

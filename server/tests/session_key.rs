@@ -94,5 +94,8 @@ async fn session_key_response_contains_hash_not_key() {
     let body = res.text();
     // Response must echo the hash, but must not contain a raw private key pattern
     let re = regex::Regex::new(r"0x[0-9a-fA-F]{64}").unwrap();
-    assert!(!re.is_match(&body), "raw private key pattern found in response");
+    assert!(
+        !re.is_match(&body),
+        "raw private key pattern found in response"
+    );
 }
