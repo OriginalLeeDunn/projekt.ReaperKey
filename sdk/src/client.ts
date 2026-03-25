@@ -24,10 +24,20 @@ type RawRecovery = { recovery_id: string; method: string; status: string; instru
 
 export class GhostKeyClient {
   private readonly baseUrl: string
+  private readonly config: GhostKeyConfig
   private token: string | null = null
 
   constructor(config: GhostKeyConfig) {
+    this.config = config
     this.baseUrl = config.apiUrl.replace(/\/$/, '')
+  }
+
+  private chainName(): string {
+    const map: Record<number, string> = {
+      8453: 'base',
+      84532: 'base-sepolia',
+    }
+    return map[this.config.chainId] ?? `chain-${this.config.chainId}`
   }
 
   setToken(token: string): void {
@@ -134,7 +144,8 @@ export class GhostKeyClient {
     return { data: this.mapAuth(res.data), error: null }
   }
 
-  async createAccount(chain: string, address: string): Promise<ApiResult<GhostKeyAccount>> {
+  async createAccount(address: string): Promise<ApiResult<GhostKeyAccount>> {
+    const chain = this.chainName()
     const res = await this.request<RawAccount>('POST', '/account/create', { chain, address })
     if (res.error) return res
     return { data: this.mapAccount(res.data), error: null }
@@ -178,7 +189,7 @@ export class GhostKeyClient {
   }
 
   async initiateRecovery(accountAddress: string): Promise<ApiResult<RecoveryResult>> {
-    const res = await this.request<RawRecovery>('POST', '/recovery/init', {
+    const res = await this.request<RawRecovery>('POST', '/recovery/initiate', {
       account_address: accountAddress,
     })
     if (res.error) return res
