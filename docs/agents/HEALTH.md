@@ -1,7 +1,7 @@
 # GhostKey — System Health Dashboard
 
 **Maintained by:** Governor Agent
-**Last Updated:** 2026-03-25 (post-deploy #3)
+**Last Updated:** 2026-03-25 (post-deploy #4 — v0.3.1)
 **Next Scheduled Assessment:** 2026-04-01
 
 ---
@@ -9,22 +9,24 @@
 ## Current System State
 
 ```
-OVERALL: HEALTHY — Phase 3 COMPLETE — v0.3.0 on main
-──────────────────────────────────────────────────────────
+OVERALL: HEALTHY — v0.3.1 on main — Phase 3 COMPLETE — Phase 4 READY
+──────────────────────────────────────────────────────────────────────
 AGENT CORP:        ✓ 18 agents defined
 DOCS CURRENCY:     ✓ All docs fresh (updated 2026-03-25)
 DRIFT FINDINGS:    ✓ 0 open
 SECURITY FINDINGS: ✓ 0 open
-PHASE PROGRESS:    Phase 3 COMPLETE — merged to main 2026-03-25
+PHASE PROGRESS:    Phase 3 COMPLETE — Phase 4 next
 REPO:              ✓ Public on GitHub — OriginalLeeDunn/projekt.ReaperKey
-BRANCHES:          ✓ main (Phase 3) + dev (synced)
-CI:                ✓ All green — rust + sdk + security + coverage (87.18%+)
-TESTS PASSING:     ✓ 27 Rust + 26 SDK = 53 total
+BRANCHES:          ✓ main (v0.3.1) + dev (synced)
+CI:                ✓ All green — rust + sdk + security + coverage
+TESTS PASSING:     ✓ 32 Rust + 38 SDK = 70 total
 TESTS IGNORED:     0
-COVERAGE:          87.18%+ Rust (gate: 80%)
+COVERAGE:          87.18%+ Rust (gate: 80%) | 96.83% SDK lines / 80.48% branches
 README:            ✓ Live
-CHANGELOG:         ✓ v0.1.0 + v0.2.0 + v0.3.0 published
-DEPLOYMENTS LOG:   ✓ Deployments #1, #2, and #3 recorded
+CHANGELOG:         ✓ v0.1.0 + v0.2.0 + v0.3.0 + v0.3.1 published
+DEPLOYMENTS LOG:   ✓ Deployments #1 through #4 recorded
+RELEASES:          ✓ v0.1.0 + v0.2.0 + v0.3.0 + v0.3.1 on GitHub
+OPEN ISSUES:       1 (#33 — error cause logging, Phase 4 scope)
 ```
 
 ---
@@ -265,6 +267,32 @@ _No open findings. RUSTSEC-2023-0071 (rsa Marvin Attack) documented and ignored 
 
 ---
 
+### 2026-03-25 — Monitor Agent — v0.3.1 Post-Deploy Assessment
+
+**Triggered by:** PR #46 merge to main (pre-Phase 4 validation gap fixes, issues #36–#43).
+
+**v0.3.1 changes:**
+- `Retry-After: 60` header on all 429 responses (closes #36)
+- Route `/recovery/init` → `/recovery/initiate` (closes #37)
+- `AppError::InvalidCalldata` → HTTP 400 + `"invalid_calldata"` (closes #38)
+- SDK `coverage.thresholds` enforced at 80% in vitest.config.ts (closes #39)
+- `GhostKeyClient.createAccount(address)` single param + `chainName()` helper (closes #40)
+- SPEC-011, SPEC-022, SPEC-031, SPEC-032, SPEC-033 tests added (closes #41)
+- `ApiResult<T>` exported from `@ghostkey/sdk` (closes #42)
+- Rate limiter replaced with true sliding window `VecDeque<Instant>` (closes #43)
+- 12 new client HTTP method tests; `index.ts` excluded from coverage
+
+**Test counts:** 32 Rust + 38 SDK = **70 total**, 0 ignored.
+**SDK coverage:** 96.83% lines, 100% functions, 80.48% branches.
+**GitHub releases:** v0.1.0, v0.2.0, v0.3.0, v0.3.1 all published.
+**All GH issues #36–#43 closed.** Only open issue: #33 (Phase 4 scope).
+
+**Readiness for Phase 4:** CI green, 0 ignored tests, 0 open pre-Phase-4 issues. All validation gaps resolved.
+
+**Overall: v0.3.1 DEPLOYED. HEALTHY. READY FOR PHASE 4.**
+
+---
+
 ## Governance Change Log
 
 | Date       | Change                                         | By              |
@@ -309,3 +337,15 @@ _No open findings. RUSTSEC-2023-0071 (rsa Marvin Attack) documented and ignored 
 | 2026-03-25 | GH Issue #33 opened — error cause logging Phase 4 | Monitor Agent  |
 | 2026-03-25 | Deployment #3 recorded in DEPLOYMENTS.md         | Monitor Agent   |
 | 2026-03-25 | Phase 3 marked COMPLETE                          | Orchestrator    |
+| 2026-03-25 | GH Issues #36–#43 filed — validation gap backlog | QA Agent        |
+| 2026-03-25 | Retry-After header on 429 (closes #36)           | Backend Eng     |
+| 2026-03-25 | /recovery/initiate route rename (closes #37)     | Backend Eng     |
+| 2026-03-25 | AppError::InvalidCalldata added (closes #38)     | Backend Eng     |
+| 2026-03-25 | SDK coverage gate enforced (closes #39)          | SDK Eng         |
+| 2026-03-25 | createAccount(address) signature fix (closes #40) | SDK Eng        |
+| 2026-03-25 | SPEC-011/022/031/032/033 tests added (closes #41) | QA Agent       |
+| 2026-03-25 | ApiResult<T> exported from SDK (closes #42)      | SDK Eng         |
+| 2026-03-25 | Sliding window rate limiter (closes #43)         | Backend Eng     |
+| 2026-03-25 | v0.2.0 + v0.3.0 + v0.3.1 tags + releases pushed | DevOps Agent    |
+| 2026-03-25 | Deployment #4 recorded in DEPLOYMENTS.md         | Monitor Agent   |
+| 2026-03-25 | v0.3.1 post-deploy assessment complete           | Monitor Agent   |

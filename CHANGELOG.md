@@ -15,6 +15,27 @@ _Nothing unreleased yet._
 
 ---
 
+## [0.3.1] — 2026-03-25
+
+### Fixed
+- `Retry-After: 60` header on all 429 responses — SPEC-006 and SPEC-035 compliance (closes #36)
+- Route renamed `/recovery/init` → `/recovery/initiate` to match spec contract; SDK client updated (closes #37)
+- `AppError::InvalidCalldata` — calldata validation returns HTTP 400 + `"invalid_calldata"` (closes #38)
+- `GhostKeyClient.createAccount(address)` — single param; chain derived from `config.chainId` via `chainName()` (closes #40)
+- Rate limiter replaced with true sliding window (`VecDeque<Instant>`) — eliminates boundary burst (closes #43)
+
+### Added
+- `ApiResult<T>` exported from `@ghostkey/sdk` package root (closes #42)
+- SDK `vitest.config.ts` — `coverage.thresholds` (80%) enforced; `index.ts` excluded from coverage (closes #39)
+- 12 new `GhostKeyClient` HTTP method tests — all methods, mappers, error paths, auth header, chainName fallback
+
+### Tests
+- SPEC-011, SPEC-022, SPEC-031, SPEC-032, SPEC-033 — all previously missing tests added (closes #41)
+- **Total: 70 tests (32 Rust + 38 SDK), 0 ignored**
+- SDK coverage: 96.83% lines, 100% functions, 80.48% branches
+
+---
+
 ## [0.3.0] — 2026-03-25
 
 ### Added
