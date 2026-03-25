@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::{
     error::{AppError, AppResult},
     middleware::AuthUser,
-    models::session::{DbSession, IssueSessionKeyRequest, SessionKeyResponse},
+    models::session::{IssueSessionKeyRequest, SessionKeyResponse},
     routes::AppState,
 };
 

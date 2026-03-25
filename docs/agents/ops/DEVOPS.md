@@ -27,40 +27,54 @@ Self-hostable is the primary deployment target.
 
 ---
 
+## Branch Strategy
+
+```
+main     ← stable, protected. Only receives PRs from dev when all CI jobs are green.
+dev      ← active development. All work happens here. CI runs on every push.
+feat/*   ← short-lived feature branches off dev (for large isolated changes).
+
+Rules:
+  - No direct pushes to main.
+  - PR dev → main requires: ALL CI jobs green + no merge conflicts.
+  - Merge strategy: squash or rebase — no merge commits on main.
+  - Every merge to main: tag the release (v0.MINOR.PATCH).
+  - CHANGELOG.md updated before every PR to main.
+```
+
 ## CI Pipeline
 
 ```yaml
-# Every PR
-on: [pull_request]
+# Runs on: push to dev/feat/*, PR to main
+on:
+  push:
+    branches: [dev, 'feat/**']
+  pull_request:
+    branches: [main]
 
 jobs:
-  backend:
-    - cargo fmt --check
-    - cargo clippy -- -D warnings
-    - cargo test
-    - cargo audit
+  rust:     cargo fmt + clippy + test + audit + tarpaulin (>= 80%)
+  sdk:      tsc + eslint + vitest + coverage (>= 80%) + npm audit
+  security: cargo test --test security (SPEC-200 through SPEC-203)
 
-  sdk:
-    - tsc --noEmit
-    - eslint
-    - vitest run
-    - npm audit
+# On merge to main only:
+  e2e:      docker-compose up → e2e suite → docker-compose down
 
-  contracts:
-    - forge fmt --check
-    - forge build
-    - forge test
-
-  coverage:
-    - cargo tarpaulin (>= 80%)
-    - vitest coverage (>= 80%)
-
-# On merge to main
-  e2e:
-    - docker-compose up
-    - run e2e test suite
-    - docker-compose down
+Gate: PR to main is blocked until all jobs above are green.
 ```
+
+## PR Protocol (dev → main)
+
+1. Push all changes to `dev` — CI runs automatically.
+2. Monitor CI at: https://github.com/OriginalLeeDunn/projekt.ReaperKey/actions
+3. When all jobs green → open PR `dev → main`.
+4. PR description must include:
+   - Summary of changes
+   - Specs covered (SPEC-XXX)
+   - CHANGELOG.md updated
+   - Any new dependencies logged in DECISIONS.md
+5. Merge → e2e job fires → Monitor Agent records in DEPLOYMENTS.md.
+6. Tag release: `git tag v0.x.y && git push origin v0.x.y`
 
 ---
 

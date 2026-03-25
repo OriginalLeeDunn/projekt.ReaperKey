@@ -76,12 +76,42 @@ GET /health
 
 ---
 
+## Deployment Monitoring
+
+The Monitor Agent tracks every deployment in `docs/agents/ops/DEPLOYMENTS.md`.
+
+### On Every Merge to main
+
+1. Record deployment entry in DEPLOYMENTS.md (commit SHA, date, what changed).
+2. Snapshot pre/post health: `/health` endpoint status, CI job results.
+3. Watch for anomaly spike in first 15 minutes post-deploy (auth failures, 5xx rate, intent errors).
+4. If anomaly detected: open GitHub issue tagged `[MONITOR]`, notify DevOps.
+5. If rollback required: flag in DEPLOYMENTS.md + HEALTH.md, escalate to Architect.
+
+### CI Watch Protocol
+
+After every CI run on `dev`:
+- Check for new test failures vs prior run.
+- Check for new clippy warnings promoted to errors.
+- Check for audit findings (cargo audit / npm audit).
+- If any new finding: log in HEALTH.md drift section, open GitHub issue.
+
+### Past Deployment Review
+
+Weekly: review last 4 deployments in DEPLOYMENTS.md for:
+- Rollback rate (target: 0)
+- Time to green CI (target: < 10 min)
+- Post-deploy anomaly count (target: 0)
+- Any unresolved issues from prior deploys
+
 ## Responsibilities
 
 - Define required log events and metrics for backend engineers.
 - Review tracing instrumentation in PRs.
 - Define alert rules for staging and production.
-- Generate weekly health report.
+- Monitor CI results on `dev` — log new failures immediately.
+- Record every main deployment in DEPLOYMENTS.md.
+- Generate weekly health report including deployment retrospective.
 - Flag any log events that leak PII or key material (escalate to Security Lead immediately).
 
 ---

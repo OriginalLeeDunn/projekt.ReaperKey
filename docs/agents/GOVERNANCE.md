@@ -81,6 +81,11 @@ This table defines when each agent must act. All agents must read this.
 | Schema change (DB migration)           | Architect, Backend Eng, QA                    | Update STACK.md data model section    |
 | Breaking SDK change                    | SDK Eng, Architect, Docs Agent                | Update STACK.md, docs, bump version   |
 | CVE found in deps                      | Dep Scanner → Security Lead                   | Log SECURITY.md, block merge if HIGH+ |
+| CI fails on dev push                   | Monitor Agent → owning engineer               | Log in DEPLOYMENTS.md, open GH issue  |
+| CI green on dev + PR opened to main    | DevOps Agent                                  | Verify CHANGELOG updated, approve PR  |
+| Merge to main (deployment)             | Monitor Agent, Docs Agent                     | Record in DEPLOYMENTS.md, watch 15min |
+| Post-deploy anomaly detected           | Monitor Agent → DevOps → Architect            | Log DEPLOYMENTS.md, open GH issue     |
+| Rollback triggered                     | DevOps Agent → Architect → Orchestrator       | Log DEPLOYMENTS.md + DECISIONS.md     |
 
 ---
 
