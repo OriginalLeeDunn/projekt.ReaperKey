@@ -41,7 +41,9 @@ pub fn validate(token: &str, secret: &str) -> Result<Claims, AppError> {
     )
     .map(|d| d.claims)
     .map_err(|e| match e.kind() {
-        jsonwebtoken::errors::ErrorKind::ExpiredSignature => AppError::Unauthorized("token_expired"),
+        jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
+            AppError::Unauthorized("token_expired")
+        }
         _ => AppError::Unauthorized("invalid_token"),
     })
 }

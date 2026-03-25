@@ -20,8 +20,7 @@ impl DbSession {
     }
 
     pub fn allows_target(&self, target: &str) -> bool {
-        let targets: Vec<String> = serde_json::from_str(&self.allowed_targets)
-            .unwrap_or_default();
+        let targets: Vec<String> = serde_json::from_str(&self.allowed_targets).unwrap_or_default();
         targets.iter().any(|t| t.eq_ignore_ascii_case(target))
     }
 

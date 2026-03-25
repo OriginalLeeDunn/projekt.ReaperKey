@@ -21,12 +21,11 @@ pub async fn init(
     Json(body): Json<RecoveryInitRequest>,
 ) -> AppResult<(StatusCode, Json<serde_json::Value>)> {
     // Look up account by address
-    let account_row: Option<(String,)> = sqlx::query_as(
-        "SELECT id FROM accounts WHERE address = ?",
-    )
-    .bind(&body.account_address)
-    .fetch_optional(&state.db)
-    .await?;
+    let account_row: Option<(String,)> =
+        sqlx::query_as("SELECT id FROM accounts WHERE address = ?")
+            .bind(&body.account_address)
+            .fetch_optional(&state.db)
+            .await?;
 
     let (account_id,) = account_row.ok_or(AppError::NotFound)?;
 
@@ -45,11 +44,14 @@ pub async fn init(
     tracing::info!(recovery_id = %recovery_id, account_id = %account_id, "recovery.init");
 
     // SPEC-040: recovery must NOT grant server key access (non-custodial constraint)
-    Ok((StatusCode::ACCEPTED, Json(serde_json::json!({
-        "recovery_id": recovery_id,
-        "method": "social",
-        "status": "initiated",
-        "instructions": "Complete recovery using your registered social recovery contacts.",
-        "note": "GhostKey does not hold your private key. Recovery is user-controlled."
-    }))))
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(serde_json::json!({
+            "recovery_id": recovery_id,
+            "method": "social",
+            "status": "initiated",
+            "instructions": "Complete recovery using your registered social recovery contacts.",
+            "note": "GhostKey does not hold your private key. Recovery is user-controlled."
+        })),
+    ))
 }

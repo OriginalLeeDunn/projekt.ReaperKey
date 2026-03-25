@@ -63,3 +63,36 @@ Format: append-only. To reverse a decision, add a `Superseded by:` line.
 | Paymaster         | Pimlico (env: BASE_PAYMASTER_URL)            |
 | Block Explorer    | https://basescan.org                         |
 | Testnet           | Base Sepolia (chain ID 84532) for dev/CI     |
+
+---
+
+## 2026-03-24 — Backend Engineer — Phase 1 Implementation Decisions
+
+**Phase:** Phase 1 (Core Engine)
+**Context:** Implementing all route handlers. Several non-obvious DB and architecture choices were made.
+**Decisions:**
+
+1. **SQLite INTEGER timestamps** — all `created_at`/`expires_at` stored as unix epoch integers (i64), not TEXT datetime. Avoids sqlx type-mapping issues with SQLite's flexible typing.
+
+2. **Primitive-typed DB row structs** — `DbUser`, `DbAccount`, etc. use `String`/`i64` only. No UUID or DateTime in row structs. Conversion happens in `.into_response()` methods. Prevents sqlx compile-time macro dependency on `DATABASE_URL`.
+
+3. **Client-side session key + counterfactual address** — session keys are generated client-side; server receives only `key_hash` (SHA-256). Account addresses are pre-computed client-side and sent to server with `POST /account/create`. Server validates format only. Enforces non-custodial constraint at the API boundary.
+
+4. **Intent execution pipeline — 202 + async bundler** — `POST /intent/execute` returns 202 immediately after scope validation. A `tokio::spawn` background task handles Pimlico sponsor → send → receipt polling (30×2s). Status is polled via `GET /intent/:id/status`. Prevents HTTP timeout on slow bundler responses.
+
+5. **DashMap rate limiter** — in-memory sliding window keyed by IP or user_id. Acceptable for v0 single-instance. If horizontal scaling needed, replace with Redis-backed solution (log in DECISIONS.md at that time).
+
+**Reviewed by:** Architect ✓ | Security Lead ✓
+**Status:** Accepted
+
+---
+
+## 2026-03-24 — DevOps Agent — Branch Strategy Established
+
+**Phase:** Phase 1 (Core Engine)
+**Context:** Repo pushed to GitHub. Branch workflow needs to be formally defined.
+**Decision:** `dev` is active development. `main` is stable. CI must be fully green before any PR from dev → main is merged. No direct pushes to main.
+**Rationale:** Prevents broken code reaching the stable branch. CI gates enforce quality automatically.
+**Risks:** Slightly slower iteration if CI is slow. Mitigated by fast Rust test suite (< 30s).
+**Reviewed by:** Orchestrator ✓
+**Status:** Accepted

@@ -1,4 +1,8 @@
-use axum::{extract::State, http::{HeaderMap, StatusCode}, Json};
+use axum::{
+    extract::State,
+    http::{HeaderMap, StatusCode},
+    Json,
+};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
@@ -49,12 +53,26 @@ pub async fn login(
         }
     };
 
-    let (token, expires_at) =
-        auth_jwt::issue(user_id, &state.config.auth.jwt_secret, state.config.auth.session_ttl_seconds)?;
+    let (token, expires_at) = auth_jwt::issue(
+        user_id,
+        &state.config.auth.jwt_secret,
+        state.config.auth.session_ttl_seconds,
+    )?;
 
     tracing::info!(user_id = %user_id, is_new, "auth.login.success");
-    let status = if is_new { StatusCode::CREATED } else { StatusCode::OK };
-    Ok((status, Json(AuthResponse { user_id, token, expires_at })))
+    let status = if is_new {
+        StatusCode::CREATED
+    } else {
+        StatusCode::OK
+    };
+    Ok((
+        status,
+        Json(AuthResponse {
+            user_id,
+            token,
+            expires_at,
+        }),
+    ))
 }
 
 /// POST /auth/refresh — SPEC-003, SPEC-004, SPEC-005
@@ -64,13 +82,21 @@ pub async fn refresh(
     Json(body): Json<RefreshRequest>,
 ) -> AppResult<Json<AuthResponse>> {
     let claims = auth_jwt::validate(&body.token, &state.config.auth.jwt_secret)?;
-    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| AppError::Unauthorized("invalid token subject"))?;
+    let user_id = Uuid::parse_str(&claims.sub)
+        .map_err(|_| AppError::Unauthorized("invalid token subject"))?;
 
-    let (token, expires_at) =
-        auth_jwt::issue(user_id, &state.config.auth.jwt_secret, state.config.auth.session_ttl_seconds)?;
+    let (token, expires_at) = auth_jwt::issue(
+        user_id,
+        &state.config.auth.jwt_secret,
+        state.config.auth.session_ttl_seconds,
+    )?;
 
     tracing::info!(user_id = %user_id, "auth.refresh.success");
-    Ok(Json(AuthResponse { user_id, token, expires_at }))
+    Ok(Json(AuthResponse {
+        user_id,
+        token,
+        expires_at,
+    }))
 }
 
 fn hash_credential(credential: &str) -> String {

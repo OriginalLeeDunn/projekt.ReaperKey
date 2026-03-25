@@ -3,8 +3,13 @@ use ghostkey::{config::*, db, routes};
 
 pub async fn test_server() -> TestServer {
     let config = Config {
-        server: ServerConfig { host: "127.0.0.1".to_string(), port: 0 },
-        database: DatabaseConfig { url: "sqlite::memory:".to_string() },
+        server: ServerConfig {
+            host: "127.0.0.1".to_string(),
+            port: 0,
+        },
+        database: DatabaseConfig {
+            url: "sqlite::memory:".to_string(),
+        },
         auth: AuthConfig {
             jwt_secret: "test-secret-minimum-32-characters!!".to_string(),
             session_ttl_seconds: 3600,
@@ -28,7 +33,8 @@ pub async fn test_server() -> TestServer {
 
 /// Register a test user and return their auth token.
 pub async fn login(server: &TestServer, email: &str) -> (String, String) {
-    let res = server.post("/auth/login")
+    let res = server
+        .post("/auth/login")
         .json(&serde_json::json!({ "method": "email", "credential": email }))
         .await;
     let body = res.json::<serde_json::Value>();

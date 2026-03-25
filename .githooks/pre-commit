@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Pre-commit hook — enforces cargo fmt before every commit.
+# Install: git config core.hooksPath .githooks
+# Agents and contributors must run this hook. It mirrors the CI fmt gate.
+
+set -e
+
+echo "→ cargo fmt --check"
+if ! cargo fmt --check 2>&1; then
+    echo ""
+    echo "✗ Formatting issues found. Run 'cargo fmt' then re-stage."
+    exit 1
+fi
+
+echo "✓ Format check passed."

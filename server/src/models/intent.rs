@@ -49,7 +49,9 @@ pub struct ExecuteIntentRequest {
     pub user_operation: serde_json::Value,
 }
 
-fn default_value() -> String { "0".to_string() }
+fn default_value() -> String {
+    "0".to_string()
+}
 
 #[derive(Debug, Serialize, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -64,11 +66,11 @@ impl std::str::FromStr for IntentStatus {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "pending"   => Ok(IntentStatus::Pending),
+            "pending" => Ok(IntentStatus::Pending),
             "submitted" => Ok(IntentStatus::Submitted),
             "confirmed" => Ok(IntentStatus::Confirmed),
-            "failed"    => Ok(IntentStatus::Failed),
-            _           => Err(()),
+            "failed" => Ok(IntentStatus::Failed),
+            _ => Err(()),
         }
     }
 }
@@ -76,10 +78,10 @@ impl std::str::FromStr for IntentStatus {
 impl IntentStatus {
     pub fn as_str(&self) -> &'static str {
         match self {
-            IntentStatus::Pending   => "pending",
+            IntentStatus::Pending => "pending",
             IntentStatus::Submitted => "submitted",
             IntentStatus::Confirmed => "confirmed",
-            IntentStatus::Failed    => "failed",
+            IntentStatus::Failed => "failed",
         }
     }
 }

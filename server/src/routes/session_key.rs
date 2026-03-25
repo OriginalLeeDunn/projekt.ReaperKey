@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::{
     error::{AppError, AppResult},
     middleware::AuthUser,
-    models::session::{DbSession, IssueSessionKeyRequest, SessionKeyResponse},
+    models::session::{IssueSessionKeyRequest, SessionKeyResponse},
     routes::AppState,
 };
 
@@ -17,12 +17,11 @@ pub async fn issue(
     Json(body): Json<IssueSessionKeyRequest>,
 ) -> AppResult<(StatusCode, Json<SessionKeyResponse>)> {
     // Verify account belongs to this user
-    let account_row: Option<(String,)> = sqlx::query_as(
-        "SELECT user_id FROM accounts WHERE id = ?",
-    )
-    .bind(body.account_id.to_string())
-    .fetch_optional(&state.db)
-    .await?;
+    let account_row: Option<(String,)> =
+        sqlx::query_as("SELECT user_id FROM accounts WHERE id = ?")
+            .bind(body.account_id.to_string())
+            .fetch_optional(&state.db)
+            .await?;
 
     let (account_user_id,) = account_row.ok_or(AppError::NotFound)?;
     let account_owner = Uuid::parse_str(&account_user_id).map_err(|_| AppError::Internal)?;
@@ -54,16 +53,20 @@ pub async fn issue(
     .execute(&state.db)
     .await?;
 
-    let expires_at_dt = chrono::Utc.timestamp_opt(expires_at, 0)
+    let expires_at_dt = chrono::Utc
+        .timestamp_opt(expires_at, 0)
         .single()
         .unwrap_or_else(Utc::now);
 
     tracing::info!(session_id = %session_id, account_id = %body.account_id, expires_at = %expires_at_dt, "session_key.issued");
 
     // SPEC-020: return session_id + key_hash (echoed) + expires_at — NOT the raw session key
-    Ok((StatusCode::CREATED, Json(SessionKeyResponse {
-        session_id,
-        key_hash: body.key_hash,
-        expires_at: expires_at_dt,
-    })))
+    Ok((
+        StatusCode::CREATED,
+        Json(SessionKeyResponse {
+            session_id,
+            key_hash: body.key_hash,
+            expires_at: expires_at_dt,
+        }),
+    ))
 }

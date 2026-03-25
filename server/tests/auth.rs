@@ -6,7 +6,8 @@ use serde_json::json;
 #[tokio::test]
 async fn login_new_user_returns_201() {
     let server = helpers::test_server().await;
-    let res = server.post("/auth/login")
+    let res = server
+        .post("/auth/login")
         .json(&json!({ "method": "email", "credential": "new@example.com" }))
         .await;
     res.assert_status(StatusCode::CREATED);
@@ -20,10 +21,12 @@ async fn login_new_user_returns_201() {
 #[tokio::test]
 async fn login_returning_user_returns_200() {
     let server = helpers::test_server().await;
-    let r1 = server.post("/auth/login")
+    let r1 = server
+        .post("/auth/login")
         .json(&json!({ "method": "email", "credential": "existing@example.com" }))
         .await;
-    let r2 = server.post("/auth/login")
+    let r2 = server
+        .post("/auth/login")
         .json(&json!({ "method": "email", "credential": "existing@example.com" }))
         .await;
     r1.assert_status(StatusCode::CREATED);
@@ -38,7 +41,8 @@ async fn login_returning_user_returns_200() {
 async fn refresh_returns_new_token() {
     let server = helpers::test_server().await;
     let (token, user_id) = helpers::login(&server, "refresh@example.com").await;
-    let res = server.post("/auth/refresh")
+    let res = server
+        .post("/auth/refresh")
         .json(&json!({ "token": token }))
         .await;
     res.assert_status(StatusCode::OK);
@@ -51,7 +55,8 @@ async fn refresh_returns_new_token() {
 #[tokio::test]
 async fn tampered_token_returns_401() {
     let server = helpers::test_server().await;
-    let res = server.post("/auth/refresh")
+    let res = server
+        .post("/auth/refresh")
         .json(&json!({ "token": "eyJhbGciOiJIUzI1NiJ9.tampered.badsig" }))
         .await;
     res.assert_status(StatusCode::UNAUTHORIZED);
@@ -62,10 +67,14 @@ async fn tampered_token_returns_401() {
 #[tokio::test]
 async fn no_private_key_in_auth_response() {
     let server = helpers::test_server().await;
-    let res = server.post("/auth/login")
+    let res = server
+        .post("/auth/login")
         .json(&json!({ "method": "email", "credential": "safe@example.com" }))
         .await;
     let body = res.text();
     let re = regex::Regex::new(r"0x[0-9a-fA-F]{64}").unwrap();
-    assert!(!re.is_match(&body), "private key pattern found in response: {body}");
+    assert!(
+        !re.is_match(&body),
+        "private key pattern found in response: {body}"
+    );
 }
