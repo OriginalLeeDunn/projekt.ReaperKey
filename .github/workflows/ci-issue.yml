@@ -1,0 +1,88 @@
+name: CI Monitor — Auto-open issues on failure
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [dev, main, 'feat/**']
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  open-issue-on-failure:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get failed jobs
+        id: jobs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const jobs = await github.rest.actions.listJobsForWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: ${{ github.event.workflow_run.id }},
+            });
+            const failed = jobs.data.jobs
+              .filter(j => j.conclusion === 'failure')
+              .map(j => `- **${j.name}** — failed step: ${j.steps.find(s => s.conclusion === 'failure')?.name ?? 'unknown'}`)
+              .join('\n');
+            core.setOutput('failed_jobs', failed || '- unknown');
+            core.setOutput('run_id', '${{ github.event.workflow_run.id }}');
+            core.setOutput('run_url', '${{ github.event.workflow_run.html_url }}');
+            core.setOutput('branch', '${{ github.event.workflow_run.head_branch }}');
+            core.setOutput('sha', '${{ github.event.workflow_run.head_sha }}'.substring(0, 7));
+            core.setOutput('commit_msg', `${{ github.event.workflow_run.head_commit.message }}`.split('\n')[0]);
+
+      - name: Check for existing open issue
+        id: existing
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'ci-failure',
+              state: 'open',
+            });
+            const runId = '${{ github.event.workflow_run.id }}';
+            const exists = issues.data.some(i => i.body?.includes(runId));
+            core.setOutput('exists', exists ? 'true' : 'false');
+
+      - name: Open GitHub issue
+        if: steps.existing.outputs.exists == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branch = '${{ steps.jobs.outputs.branch }}';
+            const sha = '${{ steps.jobs.outputs.sha }}';
+            const commitMsg = '${{ steps.jobs.outputs.commit_msg }}';
+            const failedJobs = `${{ steps.jobs.outputs.failed_jobs }}`;
+            const runUrl = '${{ steps.jobs.outputs.run_url }}';
+            const runId = '${{ steps.jobs.outputs.run_id }}';
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[CI] Failure on ${branch} — ${sha} — ${commitMsg}`,
+              labels: ['ci-failure', 'monitor-agent'],
+              body: [
+                '## CI Failure Report',
+                '',
+                `**Branch:** \`${branch}\``,
+                `**Commit:** \`${sha}\` — ${commitMsg}`,
+                `**Run:** [#${runId}](${runUrl})`,
+                '',
+                '## Failed Jobs',
+                failedJobs,
+                '',
+                '## Agent Action Required',
+                '',
+                '**Monitor Agent:** Triage and assign to the responsible engineer agent.',
+                '**DevOps Agent:** Do not merge to `main` until this issue is closed.',
+                '',
+                '> Auto-opened by CI Monitor workflow. Close this issue when the fix is pushed and CI is green.',
+              ].join('\n'),
+            });
