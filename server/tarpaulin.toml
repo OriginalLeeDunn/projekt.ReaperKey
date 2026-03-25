@@ -1,6 +1,6 @@
 [default]
 # Exclude files that require external services or are entry-point only
 exclude-files = [
-    "src/main.rs",     # binary entry point — not unit testable
-    "src/chain.rs",    # Pimlico JSON-RPC — requires live bundler, tested via E2E
+    "server/src/main.rs",   # binary entry point — not unit testable
+    "server/src/chain.rs",  # Pimlico JSON-RPC — requires live bundler, tested via E2E
 ]
