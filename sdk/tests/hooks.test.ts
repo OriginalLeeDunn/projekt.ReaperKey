@@ -6,6 +6,7 @@ import { useLogin } from '../src/hooks/useLogin.js'
 import { useAccount } from '../src/hooks/useAccount.js'
 import { useSessionKey } from '../src/hooks/useSessionKey.js'
 import { useSendIntent } from '../src/hooks/useSendIntent.js'
+import { useRecovery } from '../src/hooks/useRecovery.js'
 import type { GhostKeyClient } from '../src/client.js'
 
 // ── Mock client factory ───────────────────────────────────────────────────────
@@ -22,6 +23,7 @@ function mockClient(overrides: Partial<GhostKeyClient> = {}): GhostKeyClient {
     issueSessionKey: vi.fn(),
     executeIntent: vi.fn(),
     getIntentStatus: vi.fn(),
+    initiateRecovery: vi.fn(),
     ...overrides,
   } as unknown as GhostKeyClient
 }
@@ -284,5 +286,65 @@ describe('useSendIntent', () => {
     expect(result.current.error).toBeNull()
     expect(result.current.status).toBeNull()
     expect(result.current.txHash).toBeNull()
+  })
+})
+
+// ── useRecovery ───────────────────────────────────────────────────────────────
+
+describe('useRecovery', () => {
+  const mockRecovery = {
+    recoveryId: 'rec-1',
+    method: 'social',
+    status: 'initiated',
+    instructions: 'Complete recovery using your registered social recovery contacts.',
+  }
+
+  it('starts with null result and no error', () => {
+    const client = mockClient()
+    const { result } = renderHook(() => useRecovery(), { wrapper: wrapper(client) })
+    expect(result.current.result).toBeNull()
+    expect(result.current.error).toBeNull()
+    expect(result.current.loading).toBe(false)
+  })
+
+  it('sets result on successful initiateRecovery', async () => {
+    const client = mockClient({
+      initiateRecovery: vi.fn().mockResolvedValue({ data: mockRecovery, error: null }),
+    })
+    const { result } = renderHook(() => useRecovery(), { wrapper: wrapper(client) })
+
+    await act(async () => { await result.current.initiateRecovery('0xabc') })
+
+    expect(result.current.result).toEqual(mockRecovery)
+    expect(result.current.error).toBeNull()
+    expect(client.initiateRecovery).toHaveBeenCalledWith('0xabc')
+  })
+
+  it('sets error on failed initiateRecovery', async () => {
+    const client = mockClient({
+      initiateRecovery: vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: 'not_found', message: 'account not found' },
+      }),
+    })
+    const { result } = renderHook(() => useRecovery(), { wrapper: wrapper(client) })
+
+    await act(async () => { await result.current.initiateRecovery('0xbad') })
+
+    expect(result.current.result).toBeNull()
+    expect(result.current.error?.code).toBe('not_found')
+  })
+
+  it('reset clears all state', async () => {
+    const client = mockClient({
+      initiateRecovery: vi.fn().mockResolvedValue({ data: mockRecovery, error: null }),
+    })
+    const { result } = renderHook(() => useRecovery(), { wrapper: wrapper(client) })
+
+    await act(async () => { await result.current.initiateRecovery('0xabc') })
+    act(() => { result.current.reset() })
+
+    expect(result.current.result).toBeNull()
+    expect(result.current.error).toBeNull()
   })
 })

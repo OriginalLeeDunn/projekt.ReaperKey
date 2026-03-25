@@ -8,6 +8,7 @@ import type {
   GhostKeyError,
   Intent,
   IntentResult,
+  RecoveryResult,
   SessionKeyRequest,
   SessionKeyResponse,
 } from './types.js'
@@ -19,6 +20,7 @@ type RawAuth = { user_id: string; token: string; expires_at: string }
 type RawAccount = { account_id: string; address: string; chain: string; aa_type: string; created_at: string }
 type RawIntent = { intent_id: string; status: string; tx_hash: string | null; block_number: number | null }
 type RawSession = { session_id: string; key_hash: string; expires_at: string }
+type RawRecovery = { recovery_id: string; method: string; status: string; instructions: string }
 
 export class GhostKeyClient {
   private readonly baseUrl: string
@@ -109,6 +111,15 @@ export class GhostKeyClient {
     return { sessionId: raw.session_id, keyHash: raw.key_hash, expiresAt: raw.expires_at }
   }
 
+  private mapRecovery(raw: RawRecovery): RecoveryResult {
+    return {
+      recoveryId: raw.recovery_id,
+      method: raw.method,
+      status: raw.status,
+      instructions: raw.instructions,
+    }
+  }
+
   // ── API methods ────────────────────────────────────────────────────────────
 
   async login(method: string, credential: string): Promise<ApiResult<AuthResponse>> {
@@ -164,5 +175,13 @@ export class GhostKeyClient {
     const res = await this.request<RawIntent>('GET', `/intent/${intentId}/status`)
     if (res.error) return res
     return { data: this.mapIntent(res.data), error: null }
+  }
+
+  async initiateRecovery(accountAddress: string): Promise<ApiResult<RecoveryResult>> {
+    const res = await this.request<RawRecovery>('POST', '/recovery/init', {
+      account_address: accountAddress,
+    })
+    if (res.error) return res
+    return { data: this.mapRecovery(res.data), error: null }
   }
 }
