@@ -262,7 +262,7 @@ OWNER:  server/tests/intent.rs
 ### SPEC-040: Initiate Recovery Flow
 ```
 GIVEN:  user cannot authenticate (lost credentials)
-WHEN:   POST /recovery/init { account_address: "0x..." }
+WHEN:   POST /recovery/initiate { account_address: "0x..." }
 THEN:   - HTTP 202
         - response contains { recovery_id, method, instructions }
         - recovery record created with status "initiated"

@@ -71,6 +71,9 @@ This table defines when each agent must act. All agents must read this.
 | New npm dependency added               | Dep Scanner, SDK Engineer                     | Run npm audit, log if crypto-adjacent |
 | New chain supported                    | Architect, Backend Eng, Docs Agent            | Update STACK.md, config schema, docs  |
 | Phase N completed                      | Orchestrator, Audit Lead, Docs Agent          | Update DECISIONS.md, roadmap.md       |
+| Phase N merged to main                 | DevOps Agent, QA Agent                        | Run validation pass per phase; file issues for all gaps |
+| All phase validation gaps resolved     | DevOps Agent, Monitor Agent, Docs Agent       | Post-deploy docs branch (CHANGELOG + HEALTH + DEPLOYMENTS), git tag, GitHub release |
+| Phase N+1 gate check                   | Orchestrator, Governor                        | Confirm: 0 open issues (except N+1 scope), tag + release published, all docs current |
 | Security finding opened                | Security Lead, Audit Lead                     | Log in SECURITY.md, DECISIONS.md      |
 | Security finding resolved              | Security Lead, Audit Lead                     | Update SECURITY.md with resolution    |
 | Contract code changed                  | Contract Auditor, Security Lead               | Audit required before merge           |
