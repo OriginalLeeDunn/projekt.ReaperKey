@@ -78,6 +78,113 @@ Gate: PR to main is blocked until all jobs above are green.
 
 ---
 
+## Phase Completion Workflow
+
+Every time a phase merges to main, the following must happen **before** Phase N+1 begins:
+
+### Step 1 — Validation Pass
+Run a validation agent per phase to check code against specs:
+```
+For each completed phase:
+  - Read all SPEC-XXX tests for that phase
+  - Read the actual implementation files
+  - Compare: any spec not tested? Any test not passing? Any API mismatch?
+  - File a GitHub issue for each gap found (label: agent-fix, qa)
+```
+Gate: **All validation gaps must be filed as issues and resolved before proceeding.**
+
+### Step 2 — Fix Issues
+For each issue filed:
+1. Create `fix/<slug>` branch off `dev`
+2. Fix, commit with `closes #N` in message
+3. PR → dev → CI green → merge
+4. Repeat until zero open issues (except Phase N+1 scope items)
+
+### Step 3 — Post-Deploy Documentation
+After all fixes are merged to main, create a documentation update:
+
+```bash
+# 1. Create ops branch off dev
+git checkout dev && git pull
+git checkout -b ops/vX.Y.Z-post-deploy
+
+# 2. Update these files:
+#    - CHANGELOG.md         → add [X.Y.Z] section with all changes
+#    - docs/agents/HEALTH.md     → update system state block, test counts, open issues
+#    - docs/agents/ops/DEPLOYMENTS.md → append registry row + update production state
+
+# 3. Commit, push, open PR → dev
+git add CHANGELOG.md docs/agents/HEALTH.md docs/agents/ops/DEPLOYMENTS.md
+git commit -m "docs(ops): vX.Y.Z post-deploy — update HEALTH, DEPLOYMENTS, CHANGELOG"
+git push -u origin ops/vX.Y.Z-post-deploy
+gh pr create --base dev --title "docs(ops): vX.Y.Z post-deploy documentation update"
+
+# 4. CI green → merge to dev → open PR dev → main → CI green → merge
+```
+
+### Step 4 — Git Tags + GitHub Releases
+
+After the docs PR merges to main:
+
+```bash
+# Tag against the correct commit (use merge commit SHA from main)
+git tag vX.Y.Z <commit-sha>
+git push origin vX.Y.Z
+
+# Create GitHub release
+gh release create vX.Y.Z \
+  --title "vX.Y.Z — Phase N: <short description>" \
+  --notes "$(cat <<'EOF'
+## What's new
+<paste CHANGELOG section>
+
+## Test coverage
+- N Rust tests + N SDK tests = N total
+- Coverage: N% Rust | N% SDK
+EOF
+)"
+```
+
+**Important:** `gh release create` uses the tag name as the positional argument — do NOT use `--target <SHA>` (GitHub rejects short SHAs for that flag; use the tag itself).
+
+### Step 5 — Issue Cleanup
+
+GitHub only auto-closes issues via "closes #N" in commit messages when merged to the default branch directly. If any issues don't auto-close:
+
+```bash
+# Manually close with a resolution comment
+gh issue close <N> --comment "Resolved in vX.Y.Z (commit <SHA>). <one-line description of fix>."
+```
+
+Check after every PR merge to main:
+```bash
+gh issue list --state open
+# Should only show Phase N+1 scope items
+```
+
+---
+
+## Validation Protocol (Before Phase N+1)
+
+This is a required gate. Phase N+1 does not start until:
+
+- [ ] All Phase N specs have a passing test
+- [ ] All validation gap issues are CLOSED
+- [ ] `CHANGELOG.md` has a `[vX.Y.Z]` entry
+- [ ] `HEALTH.md` system state block reflects current test counts + coverage
+- [ ] `DEPLOYMENTS.md` has the new deployment row
+- [ ] Git tag `vX.Y.Z` exists and GitHub release is published
+- [ ] Zero open issues except Phase N+1 scope
+
+Run this check:
+```bash
+gh issue list --state open          # should be Phase N+1 scope only
+gh release list --limit 5           # vX.Y.Z should appear
+git tag --list | sort -V | tail -5  # tag should exist
+```
+
+---
+
 ## Local Dev Setup Target
 
 ```bash
