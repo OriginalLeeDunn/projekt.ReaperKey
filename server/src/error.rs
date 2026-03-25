@@ -45,7 +45,7 @@ impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, code) = match &self {
             AppError::NotFound => (StatusCode::NOT_FOUND, "not_found"),
-            AppError::Unauthorized(_) => (StatusCode::UNAUTHORIZED, "invalid_token"),
+            AppError::Unauthorized(code) => (StatusCode::UNAUTHORIZED, *code),
             AppError::Forbidden => (StatusCode::FORBIDDEN, "forbidden"),
             AppError::BadRequest(_) => (StatusCode::BAD_REQUEST, "bad_request"),
             AppError::RateLimited => (StatusCode::TOO_MANY_REQUESTS, "rate_limited"),
