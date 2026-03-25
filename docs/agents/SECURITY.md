@@ -7,34 +7,36 @@ Findings are logged here. Resolved findings stay in the log with resolution note
 
 ## Active Findings
 
-_None yet — project in Phase 0._
+_None._
 
 ---
 
 ## Resolved Findings
 
-_None yet._
+_None._
 
 ---
 
 ## Acceptable Risk Suppressions
 
-_None yet. Any suppressed CVE or known risk must be logged here with justification._
+| CVE / Advisory | Suppressed | Justification | Added |
+|----------------|-----------|---------------|-------|
+| RUSTSEC-2023-0071 (rsa Marvin Attack) | `.cargo/audit.toml` | RSA crate is a transitive dep; server uses SQLite only — no RSA code path reachable | 2026-03-24 |
 
 ---
 
 ## Security Review Gates Status
 
-### Phase 1 (Engine) — NOT YET STARTED
-- [ ] Auth endpoints rate limited
-- [ ] No key material in logs
-- [ ] SQL injection impossible (parameterized queries only)
-- [ ] Session keys expire and are non-reusable
+### Phase 1 (Engine) — COMPLETE (as of v0.1.0–v0.3.0)
+- [x] Auth endpoints rate limited — `DashMap` sliding window middleware; 10-req/window limit tested (SPEC-006 ✓)
+- [x] No key material in logs — `keyHash` only stored/logged; raw key never handled server-side
+- [x] SQL injection impossible — parameterized SQLx queries + SHA-256 credential hashing; SPEC-201 passing ✓
+- [x] Session keys expire and are non-reusable — `ttlSeconds` enforced; `expiresAt` stored
 
-### Phase 2 (SDK) — NOT YET STARTED
-- [ ] Private key never sent to server
-- [ ] Session key stored in memory or secure browser storage only
-- [ ] User confirmation required before any transaction
+### Phase 2 (SDK) — COMPLETE (as of v0.2.0–v0.3.0)
+- [x] Private key never sent to server — `generateSessionKey()` returns `{ privateKey, keyHash }`; only `keyHash` goes in `SessionKeyRequest`
+- [x] Session key stored in memory only — `useSessionKey` holds it in React state; never written to localStorage or cookies
+- [ ] User confirmation required before any transaction — reference app shows the intent before sending; not yet enforced by SDK API (Phase 4 gate)
 
 ### Phase 4 (Hardening) — NOT YET STARTED
 - [ ] Full rate limiting on all sensitive endpoints

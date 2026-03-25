@@ -1,7 +1,7 @@
 # GhostKey — System Health Dashboard
 
 **Maintained by:** Governor Agent
-**Last Updated:** 2026-03-25
+**Last Updated:** 2026-03-25 (post-deploy #3)
 **Next Scheduled Assessment:** 2026-04-01
 
 ---
@@ -9,22 +9,22 @@
 ## Current System State
 
 ```
-OVERALL: HEALTHY — Phase 2 COMPLETE — v0.2.0 on main
+OVERALL: HEALTHY — Phase 3 COMPLETE — v0.3.0 on main
 ──────────────────────────────────────────────────────────
 AGENT CORP:        ✓ 18 agents defined
-DOCS CURRENCY:     ✓ All docs fresh (updated 2026-03-24)
+DOCS CURRENCY:     ✓ All docs fresh (updated 2026-03-25)
 DRIFT FINDINGS:    ✓ 0 open
 SECURITY FINDINGS: ✓ 0 open
-PHASE PROGRESS:    Phase 2 COMPLETE — merged to main 2026-03-25
+PHASE PROGRESS:    Phase 3 COMPLETE — merged to main 2026-03-25
 REPO:              ✓ Public on GitHub — OriginalLeeDunn/projekt.ReaperKey
-BRANCHES:          ✓ main (Phase 2) + dev (synced)
-CI:                ✓ All green — rust + sdk + security + coverage (87.18%)
-TESTS PASSING:     ✓ 25 Rust + 18 SDK = 43 total
-TESTS IGNORED:     1 (SPEC-201 SQL injection — tracked GH #19)
-COVERAGE:          87.18% Rust (gate: 80%)
+BRANCHES:          ✓ main (Phase 3) + dev (synced)
+CI:                ✓ All green — rust + sdk + security + coverage (87.18%+)
+TESTS PASSING:     ✓ 27 Rust + 26 SDK = 53 total
+TESTS IGNORED:     0
+COVERAGE:          87.18%+ Rust (gate: 80%)
 README:            ✓ Live
-CHANGELOG:         ✓ v0.1.0 + v0.2.0 published
-DEPLOYMENTS LOG:   ✓ Deployments #1 and #2 recorded
+CHANGELOG:         ✓ v0.1.0 + v0.2.0 + v0.3.0 published
+DEPLOYMENTS LOG:   ✓ Deployments #1, #2, and #3 recorded
 ```
 
 ---
@@ -99,8 +99,8 @@ DEPLOYMENTS LOG:   ✓ Deployments #1 and #2 recorded
 | Phase 0: Alignment           | ✓ COMPLETE   | Orchestrator  | None            |
 | Phase 1: Core Engine         | ✓ COMPLETE   | Backend Eng   | None — all ISS resolved |
 | Phase 2: SDK                 | ✓ COMPLETE   | SDK Eng       | None — merged 2026-03-25 |
-| Phase 3: Reference App       | NOT STARTED  | SDK Eng       | Awaiting P2 (#22) |
-| Phase 4: Hardening           | NOT STARTED  | Security Lead | Awaiting P3     |
+| Phase 3: Reference App       | ✓ COMPLETE   | SDK Eng       | None — merged 2026-03-25 |
+| Phase 4: Hardening           | NOT STARTED  | Security Lead | #33 (error logging), #34+ pending |
 | Phase 5: Open Source Launch  | NOT STARTED  | Orchestrator  | Awaiting P4     |
 
 ### Phase 0 Completion Record
@@ -139,6 +139,23 @@ DEPLOYMENTS LOG:   ✓ Deployments #1 and #2 recorded
 - [x] CI push trigger narrowed — feat/fix/ops branches no longer fire push CI (PR-only)
 - [x] Merge strategy switched to merge commits — no more dev/main divergence
 - [x] v0.2.0 merged to main — Deployment #2 recorded
+
+### Phase 3 Completion Record
+- [x] `AppError::Unauthorized` bug fixed — `IntoResponse` now emits inner `*code` (was hardcoded `"invalid_token"`)
+- [x] SPEC-004 — expired token returns 401 `token_expired` (closes GH #18)
+- [x] SPEC-006 — 11th login returns 429 `rate_limited` (closes GH #18)
+- [x] SPEC-201 SQL injection test unignored — confirmed safe via parameterized queries (closes GH #19)
+- [x] `config.toml.example` with full inline docs — `make dev` no longer fails for new contributors (closes GH #20)
+- [x] `generateSessionKey()` WebCrypto utility — 32-byte key + SHA-256 `keyHash`; private key never leaves client (closes GH #21)
+- [x] `useRecovery` hook — `initiateRecovery`, `result`, `loading`, `error`, `reset` (closes GH #21)
+- [x] 4 crypto tests + 4 `useRecovery` hook tests passing
+- [x] `tests/setup.crypto.ts` polyfill — `globalThis.crypto.subtle` available in vitest jsdom
+- [x] `tsup.config.ts` — fixed `npm run build` "No input files" error
+- [x] `example/` reference app — 5-step GhostKey flow in React (closes GH #22)
+- [x] `example/src/vite-env.d.ts` — vite client types; `import.meta.env` TypeScript clean
+- [x] `example/node_modules/` + `example/dist/` added to `.gitignore`
+- [x] v0.3.0 merged to main — Deployment #3 recorded
+- [x] All GH issues #18–#22 closed
 
 ---
 
@@ -223,6 +240,31 @@ _No open findings. RUSTSEC-2023-0071 (rsa Marvin Attack) documented and ignored 
 
 ---
 
+### 2026-03-25 — Monitor Agent — Phase 3 Completion / Post-Deploy Assessment
+
+**Triggered by:** PR #32 merge to main (Phase 3 reference app + all supporting issues #18–#22).
+
+**Phase 3 status:** COMPLETE. All GH issues #18–#22 resolved and merged. CI all green.
+**Deployment #3:** 1b23d76 — 53 tests passing (27 Rust + 26 SDK). TESTS_IGNORED = 0.
+**New SDK tests:** 4 crypto tests (`generateSessionKey` — uniqueness, SHA-256 correctness, hex format) + 4 `useRecovery` tests (idle state, success, error, reset).
+**New Rust tests:** SPEC-004 (expired token → 401 `token_expired`) + SPEC-006 (11th login → 429 `rate_limited`) — total auth tests now 7.
+**Critical bug fixed:** `AppError::Unauthorized` `IntoResponse` was always emitting `"invalid_token"` — inner `&'static str` was ignored. SPEC-004 was failing because of this; fixed in `error.rs` with `*code` dereference.
+**TESTS_IGNORED reduced 1 → 0:** SPEC-201 SQL injection test unignored — SQLx parameterized queries + SHA-256 credential hashing confirmed safe.
+**Reference app:** `example/` demonstrates full non-custodial flow — private key displayed in amber to prove it never leaves the client.
+**WebCrypto polyfill:** vitest jsdom environment doesn't expose `globalThis.crypto.subtle` — fixed via `tests/setup.crypto.ts` + `setupFiles` in `vitest.config.ts`.
+**Build fix:** `tsup.config.ts` created — `npm run build` was failing "No input files" without it.
+**GH Issue #33 opened:** `AppError::Internal` swallows error cause in logs — Phase 4 work item for production ops observability.
+**Open Phase 4 issues:** #33 (error cause logging). Additional Phase 4 issues (#34+) to be filed.
+
+**Readiness for Phase 4:**
+- Security Lead: rate limiting gaps, CORS tightening, OWASP review, PII audit in logs.
+- DevOps Agent: deployment docs, dependency audit, structured logging.
+- Blocked by: none. Dev in sync with main. CI green.
+
+**Overall: PHASE 3 COMPLETE. HEALTHY. READY FOR PHASE 4.**
+
+---
+
 ## Governance Change Log
 
 | Date       | Change                                         | By              |
@@ -256,3 +298,14 @@ _No open findings. RUSTSEC-2023-0071 (rsa Marvin Attack) documented and ignored 
 | 2026-03-25 | Hard Rule #12 added — no direct commits to main  | Governor        |
 | 2026-03-25 | Deployment #2 recorded in DEPLOYMENTS.md         | Monitor Agent   |
 | 2026-03-25 | Phase 2 marked COMPLETE                          | Orchestrator    |
+| 2026-03-25 | SPEC-004 + SPEC-006 auth tests added (closes #18) | QA Agent       |
+| 2026-03-25 | SPEC-201 SQL injection unignored (closes #19)    | QA Agent        |
+| 2026-03-25 | config.toml.example added (closes #20)           | DevOps Agent    |
+| 2026-03-25 | AppError::Unauthorized bug fixed — *code dereference | Backend Eng  |
+| 2026-03-25 | generateSessionKey() + useRecovery added (closes #21) | SDK Eng     |
+| 2026-03-25 | WebCrypto polyfill setup.crypto.ts for vitest     | SDK Eng         |
+| 2026-03-25 | tsup.config.ts added — SDK build fixed           | SDK Eng         |
+| 2026-03-25 | example/ reference app (closes #22)              | SDK Eng         |
+| 2026-03-25 | GH Issue #33 opened — error cause logging Phase 4 | Monitor Agent  |
+| 2026-03-25 | Deployment #3 recorded in DEPLOYMENTS.md         | Monitor Agent   |
+| 2026-03-25 | Phase 3 marked COMPLETE                          | Orchestrator    |
