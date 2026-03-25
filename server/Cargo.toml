@@ -44,3 +44,4 @@ hex = "0.4"
 tokio = { version = "1", features = ["full"] }
 axum-test = "15"
 regex = "1"
+wiremock = "0.6"
