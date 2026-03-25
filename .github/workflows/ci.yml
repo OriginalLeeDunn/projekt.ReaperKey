@@ -2,9 +2,14 @@ name: CI
 
 on:
   push:
-    branches: [main, dev, 'feat/**']
+    branches: [main, dev, 'feat/**', 'fix/**', 'ops/**']
   pull_request:
-    branches: [main]
+    branches: [main, dev]
+
+# Cancel any in-progress run on the same branch/PR when a new commit is pushed
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -13,8 +18,12 @@ env:
 jobs:
   # ── Rust Backend ────────────────────────────────────────────────────────────
   rust:
-    name: Rust — lint + test + audit
+    name: Rust — lint + test + audit + coverage
     runs-on: ubuntu-latest
+    # Skip if only docs/ops files changed
+    if: |
+      github.event_name == 'pull_request' ||
+      !contains(github.event.head_commit.message, '[skip ci]')
     steps:
       - uses: actions/checkout@v4
 
@@ -23,8 +32,11 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Cache Rust deps
+      - name: Cache Rust deps + tools
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-targets: true
+          cache-all-crates: true
 
       - name: Format check
         run: cargo fmt --check
@@ -32,24 +44,16 @@ jobs:
       - name: Clippy
         run: cargo clippy -- -D warnings
 
-      - name: Test
-        run: cargo test
-        env:
-          JWT_SECRET: test-secret-minimum-32-characters!!
-          BASE_RPC_URL: https://sepolia.base.org
-          BASE_BUNDLER_URL: https://test.bundler.example
-          BASE_PAYMASTER_URL: https://test.paymaster.example
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
 
-      - name: Install cargo-audit
-        run: cargo install cargo-audit --locked
+      - name: Install cargo-audit + cargo-tarpaulin (pre-built binaries)
+        run: cargo binstall cargo-audit cargo-tarpaulin --no-confirm --locked
 
       - name: Dependency audit
         run: cargo audit
 
-      - name: Install cargo-tarpaulin
-        run: cargo install cargo-tarpaulin --locked
-
-      - name: Coverage check (70% gate)
+      - name: Test + Coverage (70% gate)
         run: cargo tarpaulin --config server/tarpaulin.toml --out Xml --fail-under 70
         env:
           JWT_SECRET: test-secret-minimum-32-characters!!
@@ -83,10 +87,7 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Test
-        run: npm test
-
-      - name: Coverage check (80% gate)
+      - name: Test + Coverage (80% gate)
         run: npm run test:coverage
 
       - name: Dependency audit
