@@ -60,9 +60,10 @@ ReaperKey lets apps give users smart contract wallets (ERC-4337) without ever to
 git clone https://github.com/OriginalLeeDunn/projekt.ReaperKey.git
 cd projekt.ReaperKey
 
-# Copy env
-cp .env.example .env
-# Fill in JWT_SECRET (min 32 chars) + Pimlico API key in .env
+# Copy config template and fill in your values
+cp config.toml.example config.toml
+# Required: set jwt_secret (min 32 chars) and Pimlico API key in config.toml
+# Or export as env vars: JWT_SECRET=... BASE_BUNDLER_URL=... BASE_PAYMASTER_URL=...
 
 # Start server
 make dev
