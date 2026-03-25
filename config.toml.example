@@ -1,31 +1,46 @@
-# GhostKey Server Configuration
-# Copy to config.toml and fill in your values.
-# Secrets go in environment variables — never committed.
+# ReaperKey Server Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+# Copy this file and fill in your values:
+#
+#   cp config.toml.example config.toml
+#
+# config.toml is gitignored — secrets never leave your machine.
+#
+# Secrets can also be set via environment variables (env overrides file):
+#   JWT_SECRET          → auth.jwt_secret
+#   BASE_RPC_URL        → chains.base.rpc_url
+#   BASE_BUNDLER_URL    → chains.base.bundler_url
+#   BASE_PAYMASTER_URL  → chains.base.paymaster_url
+#
+# Full env-var override syntax (GHOSTKEY__ prefix + __ separator):
+#   GHOSTKEY__AUTH__JWT_SECRET=...
+#   GHOSTKEY__SERVER__PORT=9090
 
 [server]
-host = "0.0.0.0"
+host = "0.0.0.0"   # bind address — use 127.0.0.1 for local-only
 port = 8080
 
 [database]
-url = "sqlite:./ghostkey.db"
+url = "sqlite:./ghostkey.db"   # SQLite path; sqlite::memory: for ephemeral
 
 [auth]
-# Set via env: JWT_SECRET (minimum 32 characters)
-jwt_secret = ""
-session_ttl_seconds = 3600
+# REQUIRED: minimum 32 characters. Generate with:
+#   openssl rand -hex 32
+jwt_secret = "CHANGE_ME_minimum_32_characters_long!!"
+session_ttl_seconds = 3600   # JWT lifetime in seconds (default 1 hour)
 
+# ── Base Sepolia (testnet — default for local dev) ────────────────────────────
 [chains.base]
-# Set via env: BASE_RPC_URL, BASE_BUNDLER_URL, BASE_PAYMASTER_URL
-rpc_url      = ""
-chain_id     = 8453
-bundler_url  = ""
-paymaster_url = ""
-entry_point  = "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
+rpc_url       = "https://sepolia.base.org"
+chain_id      = 84532
+bundler_url   = "https://api.pimlico.io/v2/84532/rpc?apikey=YOUR_PIMLICO_API_KEY"
+paymaster_url = "https://api.pimlico.io/v2/84532/rpc?apikey=YOUR_PIMLICO_API_KEY"
+entry_point   = "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
 
-# For local dev / CI — use Base Sepolia
+# ── Base Mainnet (production) — replace the block above ──────────────────────
 # [chains.base]
-# rpc_url      = "https://sepolia.base.org"
-# chain_id     = 84532
-# bundler_url  = "https://api.pimlico.io/v2/84532/rpc?apikey=YOUR_KEY"
-# paymaster_url = "https://api.pimlico.io/v2/84532/rpc?apikey=YOUR_KEY"
-# entry_point  = "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
+# rpc_url       = "https://mainnet.base.org"
+# chain_id      = 8453
+# bundler_url   = "https://api.pimlico.io/v2/8453/rpc?apikey=YOUR_PIMLICO_API_KEY"
+# paymaster_url = "https://api.pimlico.io/v2/8453/rpc?apikey=YOUR_PIMLICO_API_KEY"
+# entry_point   = "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
