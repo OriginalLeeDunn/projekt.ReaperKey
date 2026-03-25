@@ -6,6 +6,7 @@ export default defineConfig({
     globals: false,
     setupFiles: ['./tests/setup.crypto.ts'],
     coverage: {
+      exclude: ['**/index.ts'],
       thresholds: {
         lines: 80,
         functions: 80,
