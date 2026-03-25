@@ -248,10 +248,11 @@ OWNER:  server/tests/intent.rs
 
 ### SPEC-035: Intent Rate Limiting
 ```
-GIVEN:  same account submits 20 intents within 60 seconds
-WHEN:   21st intent submission
+GIVEN:  same account submits 10 intents within 60 seconds (limit: 10/60s per user)
+WHEN:   11th intent submission
 THEN:   - HTTP 429
-        - Retry-After header present
+        - body: { error: "rate_limited" }
+        - Retry-After: 60 header present
 OWNER:  server/tests/intent.rs
 ```
 
