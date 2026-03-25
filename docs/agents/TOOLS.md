@@ -77,9 +77,15 @@ cargo tarpaulin --out Html --output-dir coverage/
 ```
 
 ### Linting
+
+> **RULE (Hard Rule #10):** Run `cargo fmt` on ALL Rust changes before every commit.
+> CI runs `cargo fmt --check` — a format failure wastes an entire CI run and blocks the branch.
+> The pre-commit hook at `.githooks/pre-commit` enforces this automatically.
+> Activate once per clone: `git config core.hooksPath .githooks`
+
 ```bash
-cargo fmt --check           # format check (CI gate)
-cargo fmt                   # auto-format
+cargo fmt                   # auto-format ALL Rust files — run before every commit
+cargo fmt --check           # verify format (what CI runs — fails on any diff)
 cargo clippy -- -D warnings # lint (CI gate — warnings are errors)
 ```
 
@@ -216,7 +222,7 @@ DATABASE_URL=./ghostkey.db
 
 | Step               | Tool            | Trigger       | Fails Build On          |
 |--------------------|-----------------|---------------|-------------------------|
-| Rust format check  | cargo fmt       | all PRs       | any format diff         |
+| Rust format check  | cargo fmt       | all PRs       | any format diff — **run `cargo fmt` before every commit** |
 | Rust lint          | cargo clippy    | all PRs       | any warning             |
 | Rust tests         | cargo test      | all PRs       | any test failure        |
 | Rust coverage      | cargo tarpaulin | all PRs       | below 80%               |
