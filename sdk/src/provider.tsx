@@ -12,10 +12,15 @@ const GhostKeyContext = createContext<GhostKeyContextValue | null>(null)
 export interface GhostKeyProviderProps {
   config: GhostKeyConfig
   children: ReactNode
+  /** Test-only: inject a mock client instead of constructing one. */
+  _client?: GhostKeyClient
 }
 
-export function GhostKeyProvider({ config, children }: GhostKeyProviderProps) {
-  const client = useMemo(() => new GhostKeyClient(config), [config.apiUrl, config.chainId])
+export function GhostKeyProvider({ config, children, _client }: GhostKeyProviderProps) {
+  const client = useMemo(
+    () => _client ?? new GhostKeyClient(config),
+    [_client, config.apiUrl, config.chainId],
+  )
   return (
     <GhostKeyContext.Provider value={{ client, config }}>
       {children}

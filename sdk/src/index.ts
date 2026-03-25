@@ -3,6 +3,7 @@ export { GhostKeyProvider } from './provider.js'
 export { useLogin } from './hooks/useLogin.js'
 export { useAccount } from './hooks/useAccount.js'
 export { useSendIntent } from './hooks/useSendIntent.js'
+export { useSessionKey } from './hooks/useSessionKey.js'
 export { GhostKeyClient } from './client.js'
 export type {
   GhostKeyConfig,

@@ -14,6 +14,12 @@ import type {
 
 export type ApiResult<T> = { data: T; error: null } | { data: null; error: GhostKeyError }
 
+// Raw API shapes (snake_case from Rust backend)
+type RawAuth = { user_id: string; token: string; expires_at: string }
+type RawAccount = { account_id: string; address: string; chain: string; aa_type: string; created_at: string }
+type RawIntent = { intent_id: string; status: string; tx_hash: string | null; block_number: number | null }
+type RawSession = { session_id: string; key_hash: string; expires_at: string }
+
 export class GhostKeyClient {
   private readonly baseUrl: string
   private token: string | null = null
@@ -74,36 +80,89 @@ export class GhostKeyClient {
     }
   }
 
+  // ── Response mappers (snake_case API → camelCase SDK) ──────────────────────
+
+  private mapAuth(raw: RawAuth): AuthResponse {
+    return { userId: raw.user_id, token: raw.token, expiresAt: raw.expires_at }
+  }
+
+  private mapAccount(raw: RawAccount): GhostKeyAccount {
+    return {
+      accountId: raw.account_id,
+      address: raw.address,
+      chain: raw.chain,
+      aaType: raw.aa_type,
+      createdAt: raw.created_at,
+    }
+  }
+
+  private mapIntent(raw: RawIntent): IntentResult {
+    return {
+      intentId: raw.intent_id,
+      status: raw.status as IntentResult['status'],
+      txHash: raw.tx_hash,
+      blockNumber: raw.block_number,
+    }
+  }
+
+  private mapSession(raw: RawSession): SessionKeyResponse {
+    return { sessionId: raw.session_id, keyHash: raw.key_hash, expiresAt: raw.expires_at }
+  }
+
+  // ── API methods ────────────────────────────────────────────────────────────
+
   async login(method: string, credential: string): Promise<ApiResult<AuthResponse>> {
-    return this.request('POST', '/auth/login', { method, credential })
+    const res = await this.request<RawAuth>('POST', '/auth/login', { method, credential })
+    if (res.error) return res
+    return { data: this.mapAuth(res.data), error: null }
   }
 
   async refresh(token: string): Promise<ApiResult<AuthResponse>> {
-    return this.request('POST', '/auth/refresh', { token })
+    const res = await this.request<RawAuth>('POST', '/auth/refresh', { token })
+    if (res.error) return res
+    return { data: this.mapAuth(res.data), error: null }
   }
 
-  async createAccount(chain: string): Promise<ApiResult<GhostKeyAccount>> {
-    return this.request('POST', '/account/create', { chain })
+  async createAccount(chain: string, address: string): Promise<ApiResult<GhostKeyAccount>> {
+    const res = await this.request<RawAccount>('POST', '/account/create', { chain, address })
+    if (res.error) return res
+    return { data: this.mapAccount(res.data), error: null }
   }
 
   async getAccount(accountId: string): Promise<ApiResult<GhostKeyAccount>> {
-    return this.request('GET', `/account/${accountId}`)
+    const res = await this.request<RawAccount>('GET', `/account/${accountId}`)
+    if (res.error) return res
+    return { data: this.mapAccount(res.data), error: null }
   }
 
   async issueSessionKey(req: SessionKeyRequest): Promise<ApiResult<SessionKeyResponse>> {
-    return this.request('POST', '/session-key/issue', req)
+    const res = await this.request<RawSession>('POST', '/session-key/issue', {
+      account_id: req.accountId,
+      key_hash: req.keyHash,
+      allowed_targets: req.allowedTargets,
+      allowed_selectors: req.allowedSelectors,
+      max_value_wei: req.maxValueWei,
+      ttl_seconds: req.ttlSeconds,
+    })
+    if (res.error) return res
+    return { data: this.mapSession(res.data), error: null }
   }
 
   async executeIntent(sessionId: string, intent: Intent): Promise<ApiResult<IntentResult>> {
-    return this.request('POST', '/intent/execute', {
+    const res = await this.request<RawIntent>('POST', '/intent/execute', {
       session_id: sessionId,
       target: intent.target,
       calldata: intent.calldata,
       value: intent.value ?? '0',
+      user_operation: intent.userOperation ?? {},
     })
+    if (res.error) return res
+    return { data: this.mapIntent(res.data), error: null }
   }
 
   async getIntentStatus(intentId: string): Promise<ApiResult<IntentResult>> {
-    return this.request('GET', `/intent/${intentId}/status`)
+    const res = await this.request<RawIntent>('GET', `/intent/${intentId}/status`)
+    if (res.error) return res
+    return { data: this.mapIntent(res.data), error: null }
   }
 }
