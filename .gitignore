@@ -13,11 +13,13 @@ config.toml
 /target/
 **/*.rs.bk
 
-# ── Node / TypeScript SDK ────────────────────────────────────────────────────
+# ── Node / TypeScript SDK + Example ─────────────────────────────────────────
 sdk/node_modules/
 sdk/dist/
 sdk/.turbo/
 sdk/coverage/
+example/node_modules/
+example/dist/
 *.tsbuildinfo
 
 # ── SQLite databases ─────────────────────────────────────────────────────────
