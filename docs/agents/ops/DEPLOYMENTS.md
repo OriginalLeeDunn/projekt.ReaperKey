@@ -1,7 +1,7 @@
 # ReaperKey — Deployment Registry
 
 **Maintained by:** Monitor Agent + DevOps Agent
-**Last Updated:** 2026-03-25 (post-deploy #1)
+**Last Updated:** 2026-03-25 (post-deploy #2)
 **Source:** https://github.com/OriginalLeeDunn/projekt.ReaperKey
 
 This is the authoritative record of all deployments to `main`.
@@ -15,24 +15,26 @@ Append-only — to record a rollback, add a new entry with type `ROLLBACK`.
 | # | Date | Version | Commit | Type | CI Status | Post-Deploy | Issues |
 |---|------|---------|--------|------|-----------|-------------|--------|
 | 1 | 2026-03-25 | v0.1.0 | a8c6924 Phase 1: Core Engine | RELEASE | ✓ all green | Health: ok | None |
+| 2 | 2026-03-25 | v0.2.0 | efce0e5 Phase 2: SDK — hooks, mappers, intent tests | RELEASE | ✓ all green | Health: ok | #18, #19, #20, #21 |
 
 ---
 
 ## Current Production State
 
 ```
-Environment:   v0.1.0 — merged to main 2026-03-25
-Branch:        main (commit a8c6924)
+Environment:   v0.2.0 — merged to main 2026-03-25
+Branch:        main (commit efce0e5)
 Last CI Run:   2026-03-25 — all green
                ✓ rust (fmt + clippy + test + audit)
-               ✓ security (SPEC-200, SPEC-201, SPEC-203)
-               ✓ sdk (vitest 3 passing, eslint clean)
-               ✓ coverage — 72.6% (gate: 70%)
-Phase:         Phase 1 COMPLETE
-Tests passing: 16 Rust (5 auth + 3 security + 3 account + 3 session_key + 2 recovery)
-               + 3 SDK (client smoke tests)
-Tests ignored: 0
-Coverage:      72.6% Rust (tarpaulin, excludes main.rs + chain.rs)
+               ✓ security (SPEC-200, SPEC-202, SPEC-203)
+               ✓ sdk (vitest 18 passing, eslint clean)
+               ✓ coverage — 87.18% (gate: 80%)
+Phase:         Phase 2 COMPLETE
+Tests passing: 25 Rust (5 auth + 2 security + 3 account + 3 session_key + 2 recovery
+                       + 9 intent + 1 health check)
+               + 18 SDK (3 client smoke + 15 hook tests)
+Tests ignored: 1 (SPEC-201 sql_injection_in_credential_is_safe — GH #19)
+Coverage:      87.18% Rust (tarpaulin, excludes main.rs + chain.rs)
 ```
 
 ---
@@ -42,16 +44,16 @@ Coverage:      72.6% Rust (tarpaulin, excludes main.rs + chain.rs)
 | Item | Status | Notes |
 |------|--------|-------|
 | Rust backend | ✓ Compiles clean | No warnings |
-| Auth routes | ✓ All tests green | SPEC-001, 002, 003, 005, 007 passing |
-| Security tests | ✓ Passing | SPEC-200, 201, 203 passing |
+| Auth routes | ✓ All tests green | SPEC-001, 002, 003, 005, 007 passing; SPEC-004/006 pending GH #18 |
+| Security tests | ✓ Passing | SPEC-200, 202, 203 passing; SPEC-201 ignored (#19) |
 | Account tests | ✓ 3/3 passing | Bearer auth wired (ISS-003 resolved) |
 | Session key tests | ✓ 3/3 passing | issue, wrong_owner, hash_not_key |
 | Recovery tests | ✓ 2/2 passing | initiate 202, unknown_address 404 |
-| Intent tests | Not written | GH Issue #8 — requires mock chain adapter |
-| TypeScript SDK | ✓ 3 tests passing | client smoke tests; ESLint clean |
-| CI trigger | ✓ Active | dev + feat/* + PRs to main |
-| README.md | ✓ Created | — |
-| CHANGELOG.md | ✓ Updated | v0.1.0 released |
+| Intent tests | ✓ 9/9 passing | SPEC-030–SPEC-035 with wiremock mock bundler |
+| TypeScript SDK | ✓ 18 tests passing | 3 client smoke + 15 hook tests; ESLint clean |
+| CI trigger | ✓ Active | PR merges to dev/main; push only on dev/main |
+| README.md | ✓ Live | — |
+| CHANGELOG.md | ✓ Updated | v0.1.0 + v0.2.0 released |
 
 ---
 
