@@ -9,22 +9,22 @@
 ## Current System State
 
 ```
-OVERALL: HEALTHY — Phase 1 COMPLETE — v0.1.0 on main
+OVERALL: HEALTHY — Phase 2 COMPLETE — v0.2.0 on main
 ──────────────────────────────────────────────────────────
 AGENT CORP:        ✓ 18 agents defined
-DOCS CURRENCY:     ✓ All docs fresh (updated 2026-03-25)
+DOCS CURRENCY:     ✓ All docs fresh (updated 2026-03-24)
 DRIFT FINDINGS:    ✓ 0 open
 SECURITY FINDINGS: ✓ 0 open
-PHASE PROGRESS:    Phase 1 COMPLETE — merged to main as v0.1.0 (2026-03-25)
+PHASE PROGRESS:    Phase 2 COMPLETE — merged to main 2026-03-25
 REPO:              ✓ Public on GitHub — OriginalLeeDunn/projekt.ReaperKey
-BRANCHES:          ✓ main (v0.1.0) + dev (synced)
-CI:                ✓ All green — rust + sdk + security + coverage (72.6%)
-TESTS PASSING:     ✓ 16 Rust + 3 SDK = 19 total
-TESTS IGNORED:     0
-COVERAGE:          72.6% Rust (gate: 70%) — GH #8 tracks path to 80%
+BRANCHES:          ✓ main (Phase 2) + dev (synced)
+CI:                ✓ All green — rust + sdk + security + coverage (87.18%)
+TESTS PASSING:     ✓ 25 Rust + 18 SDK = 43 total
+TESTS IGNORED:     1 (SPEC-201 SQL injection — tracked GH #19)
+COVERAGE:          87.18% Rust (gate: 80%)
 README:            ✓ Live
-CHANGELOG:         ✓ v0.1.0 published
-DEPLOYMENTS LOG:   ✓ Deployment #1 recorded
+CHANGELOG:         ✓ v0.1.0 + v0.2.0 published
+DEPLOYMENTS LOG:   ✓ Deployments #1 and #2 recorded
 ```
 
 ---
@@ -98,8 +98,8 @@ DEPLOYMENTS LOG:   ✓ Deployment #1 recorded
 |------------------------------|--------------|---------------|-----------------|
 | Phase 0: Alignment           | ✓ COMPLETE   | Orchestrator  | None            |
 | Phase 1: Core Engine         | ✓ COMPLETE   | Backend Eng   | None — all ISS resolved |
-| Phase 2: SDK                 | NOT STARTED  | SDK Eng       | Awaiting P1     |
-| Phase 3: Reference App       | NOT STARTED  | SDK Eng       | Awaiting P2     |
+| Phase 2: SDK                 | ✓ COMPLETE   | SDK Eng       | None — merged 2026-03-25 |
+| Phase 3: Reference App       | NOT STARTED  | SDK Eng       | Awaiting P2 (#22) |
 | Phase 4: Hardening           | NOT STARTED  | Security Lead | Awaiting P3     |
 | Phase 5: Open Source Launch  | NOT STARTED  | Orchestrator  | Awaiting P4     |
 
@@ -126,6 +126,19 @@ DEPLOYMENTS LOG:   ✓ Deployment #1 recorded
 - [x] README.md, CHANGELOG.md, DEPLOYMENTS.md created
 - [x] v0.1.0 tagged and merged to main (commit a8c6924)
 - [x] Deployment #1 recorded in DEPLOYMENTS.md
+
+### Phase 2 Completion Record
+- [x] `client.ts` response mappers — snake_case → camelCase (was silently returning `undefined`)
+- [x] `useSessionKey` hook — issue, clear, error handling
+- [x] `useSendIntent` hook — execute + poll status, reset
+- [x] `useAccount` hook extended — `fetchAccount()`, `address` param on `createAccount`
+- [x] `GhostKeyProvider._client` injection for test isolation
+- [x] 15 React hook tests using `@testing-library/react` (jsdom)
+- [x] 9 intent integration tests (SPEC-030–SPEC-035) with wiremock mock bundler
+- [x] Coverage gate raised to 80%, passing at 87.18%
+- [x] CI push trigger narrowed — feat/fix/ops branches no longer fire push CI (PR-only)
+- [x] Merge strategy switched to merge commits — no more dev/main divergence
+- [x] v0.2.0 merged to main — Deployment #2 recorded
 
 ---
 
@@ -188,6 +201,28 @@ _No open findings. RUSTSEC-2023-0071 (rsa Marvin Attack) documented and ignored 
 
 ---
 
+### 2026-03-25 — Monitor Agent — Phase 2 Completion / Post-Deploy Assessment
+
+**Triggered by:** Phase 2 SDK merge to main.
+
+**Phase 2 status:** COMPLETE. SDK hooks fully implemented and tested. All CI jobs green.
+**Deployment #2:** efce0e5 — 43 tests passing (25 Rust + 18 SDK). Coverage 87.18% (gate 80%).
+**SDK coverage:** 15 React hook tests (useLogin×4, useAccount×4, useSessionKey×3, useSendIntent×4).
+**Rust coverage:** 9 new intent integration tests with wiremock mock bundler (SPEC-030 through SPEC-035).
+**Silent bug fixed:** `client.ts` was casting snake_case JSON directly to camelCase TypeScript types — all fields were `undefined`. Explicit mapper functions added.
+**CI governance fixes:** push trigger narrowed (feat/fix/ops branches no longer trigger push CI); merge strategy switched to merge commits to prevent dev/main divergence.
+**Hard Rules:** #12 added — no direct commits to main, ever.
+**Open GH Issues:** #18 (SPEC-004 + SPEC-006), #19 (SPEC-201 SQL injection — unignore), #20 (config.toml.example), #21 (useRecovery hook), #22 (Phase 3 reference app).
+
+**Readiness for Phase 3:**
+- Phase 3 scope: `example/` reference app demonstrating full GhostKey flow.
+- Blocked by: #21 (useRecovery + generateSessionKey) must land first.
+- CI green. Dev in sync with main.
+
+**Overall: PHASE 2 COMPLETE. HEALTHY. READY FOR PHASE 3.**
+
+---
+
 ## Governance Change Log
 
 | Date       | Change                                         | By              |
@@ -213,3 +248,11 @@ _No open findings. RUSTSEC-2023-0071 (rsa Marvin Attack) documented and ignored 
 | 2026-03-25 | PR #9 merged — Phase 1 COMPLETE on main         | Orchestrator    |
 | 2026-03-25 | v0.1.0 tagged (commit a8c6924)                  | DevOps Agent    |
 | 2026-03-25 | Deployment #1 recorded in DEPLOYMENTS.md        | Monitor Agent   |
+| 2026-03-25 | Phase 2 SDK work merged — hooks, tests, mappers | SDK Eng         |
+| 2026-03-25 | wiremock mock bundler — 9 intent tests added     | QA Agent        |
+| 2026-03-25 | Coverage gate raised 70% → 80% (87.18% actual)  | DevOps Agent    |
+| 2026-03-25 | CI push trigger narrowed — feat/fix/ops excluded | DevOps Agent    |
+| 2026-03-25 | Merge strategy → merge commits (no divergence)   | DevOps Agent    |
+| 2026-03-25 | Hard Rule #12 added — no direct commits to main  | Governor        |
+| 2026-03-25 | Deployment #2 recorded in DEPLOYMENTS.md         | Monitor Agent   |
+| 2026-03-25 | Phase 2 marked COMPLETE                          | Orchestrator    |
