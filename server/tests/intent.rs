@@ -1,8 +1,9 @@
 //! Intent integration tests
-//! Covers: SPEC-030, SPEC-031, SPEC-032, SPEC-033, SPEC-034, SPEC-035
+//! Covers: SPEC-022, SPEC-030, SPEC-031, SPEC-032, SPEC-033, SPEC-034, SPEC-035
 
 mod helpers;
 use axum::http::StatusCode;
+use chrono::Utc;
 use serde_json::json;
 use wiremock::{
     matchers::{method, path},
@@ -125,10 +126,143 @@ async fn get_intent_status_returns_intent() {
     status_res.assert_status_ok();
     let body = status_res.json::<serde_json::Value>();
     assert_eq!(body["intent_id"], intent_id);
-    assert!(body["status"].is_string());
+    assert_eq!(body["status"], "pending");
+    assert!(
+        body["tx_hash"].is_null(),
+        "tx_hash should be null for pending intent"
+    );
 }
 
-// SPEC-032: get unknown intent → 404
+// SPEC-032 (confirmed): after DB update to confirmed + tx_hash, status returns confirmed fields
+#[tokio::test]
+async fn get_intent_status_confirmed_returns_confirmed_fields() {
+    let bundler = mock_bundler().await;
+    let (server, pool) =
+        helpers::test_server_and_db_with_bundler(&bundler.uri(), &bundler.uri()).await;
+    let (token, session_id) = setup_intent(&server, "intent-confirmed@example.com").await;
+
+    let execute_res = server
+        .post("/intent/execute")
+        .add_header("Authorization", format!("Bearer {token}"))
+        .json(&json!({
+            "session_id": session_id,
+            "target": TEST_ADDR,
+            "calldata": VALID_CALLDATA,
+            "value": "0",
+            "user_operation": {}
+        }))
+        .await;
+    let intent_id = execute_res.json::<serde_json::Value>()["intent_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // Directly update the DB to simulate a confirmed state
+    let fake_tx_hash = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
+    let now = Utc::now().timestamp();
+    sqlx::query(
+        "UPDATE intents SET status = 'confirmed', tx_hash = ?, block_number = 42, updated_at = ? WHERE id = ?",
+    )
+    .bind(fake_tx_hash)
+    .bind(now)
+    .bind(&intent_id)
+    .execute(&pool)
+    .await
+    .expect("DB update");
+
+    let status_res = server
+        .get(&format!("/intent/{intent_id}/status"))
+        .add_header("Authorization", format!("Bearer {token}"))
+        .await;
+
+    status_res.assert_status_ok();
+    let body = status_res.json::<serde_json::Value>();
+    assert_eq!(body["status"], "confirmed");
+    assert!(
+        body["tx_hash"].is_string(),
+        "tx_hash should be a string for confirmed intent"
+    );
+    assert!(
+        body["block_number"].is_number(),
+        "block_number should be a number for confirmed intent"
+    );
+}
+
+// SPEC-033 (failed): after DB update to failed, status returns failed
+#[tokio::test]
+async fn get_intent_status_failed_returns_failed() {
+    let bundler = mock_bundler().await;
+    let (server, pool) =
+        helpers::test_server_and_db_with_bundler(&bundler.uri(), &bundler.uri()).await;
+    let (token, session_id) = setup_intent(&server, "intent-failed@example.com").await;
+
+    let execute_res = server
+        .post("/intent/execute")
+        .add_header("Authorization", format!("Bearer {token}"))
+        .json(&json!({
+            "session_id": session_id,
+            "target": TEST_ADDR,
+            "calldata": VALID_CALLDATA,
+            "value": "0",
+            "user_operation": {}
+        }))
+        .await;
+    let intent_id = execute_res.json::<serde_json::Value>()["intent_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // Directly update the DB to simulate a failed state
+    let now = Utc::now().timestamp();
+    sqlx::query("UPDATE intents SET status = 'failed', updated_at = ? WHERE id = ?")
+        .bind(now)
+        .bind(&intent_id)
+        .execute(&pool)
+        .await
+        .expect("DB update");
+
+    let status_res = server
+        .get(&format!("/intent/{intent_id}/status"))
+        .add_header("Authorization", format!("Bearer {token}"))
+        .await;
+
+    status_res.assert_status_ok();
+    let body = status_res.json::<serde_json::Value>();
+    assert_eq!(body["status"], "failed");
+}
+
+// SPEC-022: expired session key → 401 with session_expired
+#[tokio::test]
+async fn execute_intent_expired_session_returns_401() {
+    let (server, pool) = helpers::test_server_and_db().await;
+    let (token, session_id) = setup_intent(&server, "intent-expired-session@example.com").await;
+
+    // Force the session to be expired by setting expires_at to the past
+    let past = Utc::now().timestamp() - 7200; // 2 hours ago
+    sqlx::query("UPDATE sessions SET expires_at = ? WHERE id = ?")
+        .bind(past)
+        .bind(&session_id)
+        .execute(&pool)
+        .await
+        .expect("DB update");
+
+    let res = server
+        .post("/intent/execute")
+        .add_header("Authorization", format!("Bearer {token}"))
+        .json(&json!({
+            "session_id": session_id,
+            "target": TEST_ADDR,
+            "calldata": VALID_CALLDATA,
+            "value": "0",
+            "user_operation": {}
+        }))
+        .await;
+
+    res.assert_status(StatusCode::UNAUTHORIZED);
+    assert_eq!(res.json::<serde_json::Value>()["error"], "session_expired");
+}
+
+// SPEC-032 (original test renamed): get unknown intent → 404
 #[tokio::test]
 async fn get_intent_status_unknown_returns_404() {
     let server = helpers::test_server().await;
@@ -193,6 +327,7 @@ async fn execute_intent_invalid_calldata_returns_400() {
         .await;
 
     res.assert_status(StatusCode::BAD_REQUEST);
+    assert_eq!(res.json::<serde_json::Value>()["error"], "invalid_calldata");
 }
 
 // SPEC-035: no auth → 401

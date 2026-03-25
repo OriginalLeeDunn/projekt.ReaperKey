@@ -43,7 +43,7 @@ pub fn build(db: Db, config: Config) -> Router {
         .route("/session-key/issue", post(session_key::issue))
         .route("/intent/execute", post(intent::execute))
         .route("/intent/:id/status", get(intent::status))
-        .route("/recovery/init", post(recovery::init))
+        .route("/recovery/initiate", post(recovery::init))
         .layer(TraceLayer::new_for_http())
         .layer(RequestBodyLimitLayer::new(1024 * 1024)) // 1MB — SPEC-202
         .layer(CorsLayer::permissive())
