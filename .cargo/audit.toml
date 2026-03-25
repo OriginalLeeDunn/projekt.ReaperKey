@@ -1,0 +1,22 @@
+# cargo audit configuration
+# Maintained by: Dependency Scanner Agent + Security Lead
+# Every ignore entry MUST have a documented justification.
+# Reviewed by Security Lead before merge to main.
+
+[advisories]
+
+# RUSTSEC-2023-0071 — rsa 0.9.10 — Marvin Attack (timing side-channel)
+# Justification:
+#   - This crate is pulled in ONLY via sqlx-macros-core → sqlx-mysql.
+#   - We do not use MySQL. We use SQLite exclusively (see Cargo.toml sqlx features).
+#   - sqlx-macros-core requires sqlx-mysql for compile-time macro support across all
+#     database backends, even when only sqlite is used at runtime.
+#   - The vulnerable rsa code (RSA PKCS1v15 decryption) is in the MySQL auth handshake,
+#     which we never call. Our server has no RSA decrypt operations.
+#   - No fix is available upstream (as of 2026-03-24). Tracking issue:
+#     https://github.com/launchbadge/sqlx/issues/2938
+#   - Risk: NONE for this project — the vulnerable code path is unreachable.
+#   - Reviewed by: Security Lead — 2026-03-24
+#   - Revisit: when sqlx releases a version that removes sqlx-mysql from macros-core,
+#     or when rsa publishes a patched version. Update this entry at that time.
+ignore = ["RUSTSEC-2023-0071"]
