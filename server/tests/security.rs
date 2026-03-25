@@ -26,7 +26,6 @@ async fn wrong_method_returns_405() {
 
 // SPEC-201: SQL injection in login credential is safely handled
 #[tokio::test]
-#[ignore = "not yet implemented"]
 async fn sql_injection_in_credential_is_safe() {
     let server = helpers::test_server().await;
     let res = server

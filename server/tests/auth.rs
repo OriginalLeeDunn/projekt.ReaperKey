@@ -2,6 +2,8 @@ mod helpers;
 use axum::http::StatusCode;
 use serde_json::json;
 
+const TEST_SECRET: &str = "test-secret-minimum-32-characters!!";
+
 // SPEC-001: new user → 201
 #[tokio::test]
 async fn login_new_user_returns_201() {
@@ -77,4 +79,61 @@ async fn no_private_key_in_auth_response() {
         !re.is_match(&body),
         "private key pattern found in response: {body}"
     );
+}
+
+// SPEC-004: expired token → 401 with error "token_expired"
+#[tokio::test]
+async fn expired_token_returns_401() {
+    let server = helpers::test_server().await;
+
+    // Craft a JWT signed with the test secret but with exp in the past.
+    // Use the concrete Claims struct so jsonwebtoken validates exp correctly.
+    let expired_claims = ghostkey::auth_jwt::Claims {
+        sub: "00000000-0000-0000-0000-000000000001".to_string(),
+        exp: 1_000_000, // 1970-01-12 — definitely expired
+        iat: 999_999,
+    };
+    let token = jsonwebtoken::encode(
+        &jsonwebtoken::Header::default(),
+        &expired_claims,
+        &jsonwebtoken::EncodingKey::from_secret(TEST_SECRET.as_bytes()),
+    )
+    .unwrap();
+
+    let res = server
+        .post("/auth/refresh")
+        .json(&json!({ "token": token }))
+        .await;
+
+    res.assert_status(StatusCode::UNAUTHORIZED);
+    assert_eq!(res.json::<serde_json::Value>()["error"], "token_expired");
+}
+
+// SPEC-006: rate limit — 11th login from same IP returns 429
+#[tokio::test]
+async fn login_rate_limit_returns_429() {
+    let server = helpers::test_server().await;
+
+    // Rate limit is 10 req / 60s per IP key.
+    // All requests hit "login:unknown" (no x-forwarded-for in test).
+    for i in 0..10 {
+        let res = server
+            .post("/auth/login")
+            .json(&json!({
+                "method": "email",
+                "credential": format!("ratelimit{i}@example.com"),
+            }))
+            .await;
+        // First 10 must succeed (201 new user each time)
+        res.assert_status(StatusCode::CREATED);
+    }
+
+    // 11th request — same "unknown" IP bucket, now exhausted
+    let res = server
+        .post("/auth/login")
+        .json(&json!({ "method": "email", "credential": "overflow@example.com" }))
+        .await;
+
+    res.assert_status(StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(res.json::<serde_json::Value>()["error"], "rate_limited");
 }
