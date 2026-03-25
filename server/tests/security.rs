@@ -16,12 +16,16 @@ async fn oversized_payload_returns_413() {
     res.assert_status(axum::http::StatusCode::PAYLOAD_TOO_LARGE);
 }
 
-// SPEC-203: wrong HTTP method returns 405
+// SPEC-203: wrong HTTP method returns 405 + Allow header
 #[tokio::test]
 async fn wrong_method_returns_405() {
     let server = helpers::test_server().await;
     let res = server.put("/auth/login").json(&json!({})).await;
     res.assert_status(axum::http::StatusCode::METHOD_NOT_ALLOWED);
+    assert!(
+        res.headers().get("allow").is_some(),
+        "SPEC-203: Allow header must be present on 405"
+    );
 }
 
 // SPEC-201: SQL injection in login credential is safely handled

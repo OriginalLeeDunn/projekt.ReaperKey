@@ -13,6 +13,7 @@ pub struct DbIntent {
     pub status: String,
     pub tx_hash: Option<String>,
     pub block_number: Option<i64>,
+    pub reason: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -24,6 +25,7 @@ impl DbIntent {
             status: self.status.parse().unwrap_or(IntentStatus::Pending),
             tx_hash: self.tx_hash,
             block_number: self.block_number,
+            reason: self.reason,
         })
     }
 
@@ -92,4 +94,5 @@ pub struct IntentResponse {
     pub status: IntentStatus,
     pub tx_hash: Option<String>,
     pub block_number: Option<i64>,
+    pub reason: Option<String>,
 }
