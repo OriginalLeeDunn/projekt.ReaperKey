@@ -7,7 +7,8 @@ export interface UseAccountReturn {
   account: GhostKeyAccount | null
   loading: boolean
   error: GhostKeyError | null
-  createAccount: (chain?: string) => Promise<void>
+  createAccount: (address: string, chain?: string) => Promise<void>
+  fetchAccount: (accountId: string) => Promise<void>
 }
 
 export function useAccount(): UseAccountReturn {
@@ -16,7 +17,7 @@ export function useAccount(): UseAccountReturn {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<GhostKeyError | null>(null)
 
-  async function createAccount(chain?: string): Promise<void> {
+  async function createAccount(address: string, chain?: string): Promise<void> {
     if (!client.isAuthenticated()) {
       setError({ code: 'not_authenticated', message: 'Login required' })
       return
@@ -26,7 +27,7 @@ export function useAccount(): UseAccountReturn {
     setError(null)
 
     const targetChain = chain ?? chainIdToName(config.chainId)
-    const result = await client.createAccount(targetChain)
+    const result = await client.createAccount(targetChain, address)
 
     setLoading(false)
 
@@ -38,7 +39,28 @@ export function useAccount(): UseAccountReturn {
     setAccount(result.data)
   }
 
-  return { account, loading, error, createAccount }
+  async function fetchAccount(accountId: string): Promise<void> {
+    if (!client.isAuthenticated()) {
+      setError({ code: 'not_authenticated', message: 'Login required' })
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    const result = await client.getAccount(accountId)
+
+    setLoading(false)
+
+    if (result.error) {
+      setError(result.error)
+      return
+    }
+
+    setAccount(result.data)
+  }
+
+  return { account, loading, error, createAccount, fetchAccount }
 }
 
 function chainIdToName(chainId: number): string {
