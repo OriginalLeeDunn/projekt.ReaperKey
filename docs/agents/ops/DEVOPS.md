@@ -37,7 +37,7 @@ feat/*   ← short-lived feature branches off dev (for large isolated changes).
 Rules:
   - No direct pushes to main.
   - PR dev → main requires: ALL CI jobs green + no merge conflicts.
-  - Merge strategy: squash or rebase — no merge commits on main.
+  - Merge strategy: merge commits (--merge). Preserves full history and keeps dev in sync with main without divergence.
   - Every merge to main: tag the release (v0.MINOR.PATCH).
   - CHANGELOG.md updated before every PR to main.
 ```

@@ -19,7 +19,8 @@ export interface GhostKeyAccount {
 export interface Intent {
   target: string
   calldata: string
-  value?: string  // wei as string — default "0"
+  value?: string        // wei as string — default "0"
+  userOperation?: Record<string, unknown>  // pre-built UserOp; defaults to {}
 }
 
 export interface IntentResult {
@@ -39,6 +40,7 @@ export interface AuthResponse {
 
 export interface SessionKeyRequest {
   accountId: string
+  keyHash: string       // SHA-256 hash of the session key — raw key never leaves client
   allowedTargets: string[]
   allowedSelectors: string[]
   maxValueWei: string
