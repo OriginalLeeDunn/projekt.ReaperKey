@@ -53,8 +53,8 @@ jobs:
       - name: Dependency audit
         run: cargo audit
 
-      - name: Test + Coverage (70% gate)
-        run: cargo tarpaulin --config server/tarpaulin.toml --out Xml --fail-under 70
+      - name: Test + Coverage (80% gate)
+        run: cargo tarpaulin --config server/tarpaulin.toml --out Xml --fail-under 80
         env:
           JWT_SECRET: test-secret-minimum-32-characters!!
           BASE_RPC_URL: https://sepolia.base.org

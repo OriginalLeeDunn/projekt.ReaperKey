@@ -2,6 +2,14 @@ use axum_test::TestServer;
 use ghostkey::{config::*, db, routes};
 
 pub async fn test_server() -> TestServer {
+    test_server_with_bundler(
+        "https://test.bundler.example",
+        "https://test.paymaster.example",
+    )
+    .await
+}
+
+pub async fn test_server_with_bundler(bundler_url: &str, paymaster_url: &str) -> TestServer {
     let config = Config {
         server: ServerConfig {
             host: "127.0.0.1".to_string(),
@@ -18,8 +26,8 @@ pub async fn test_server() -> TestServer {
             base: ChainConfig {
                 rpc_url: "https://sepolia.base.org".to_string(),
                 chain_id: 84532,
-                bundler_url: "https://test.bundler.example".to_string(),
-                paymaster_url: "https://test.paymaster.example".to_string(),
+                bundler_url: bundler_url.to_string(),
+                paymaster_url: paymaster_url.to_string(),
                 entry_point: "0x0000000071727De22E5E9d8BAf0edAc6f37da032".to_string(),
             },
         },
