@@ -1,0 +1,46 @@
+[package]
+name = "ghostkey-server"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "ghostkey-server"
+path = "src/main.rs"
+
+[lib]
+name = "ghostkey"
+path = "src/lib.rs"
+
+[dependencies]
+tokio.workspace = true
+axum.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+sqlx.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+figment.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+jsonwebtoken.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+
+# hashing
+sha2 = "0.10"
+
+# rate limiting (lock-free concurrent map)
+dashmap = "6"
+
+# http client — Pimlico bundler/paymaster calls
+reqwest = { version = "0.12", features = ["json"] }
+
+# calldata hex validation
+hex = "0.4"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
+axum-test = "15"
+regex = "1"

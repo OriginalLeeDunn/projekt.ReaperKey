@@ -1,0 +1,31 @@
+# GhostKey Server Configuration
+# Copy to config.toml and fill in your values.
+# Secrets go in environment variables — never committed.
+
+[server]
+host = "0.0.0.0"
+port = 8080
+
+[database]
+url = "sqlite:./ghostkey.db"
+
+[auth]
+# Set via env: JWT_SECRET (minimum 32 characters)
+jwt_secret = ""
+session_ttl_seconds = 3600
+
+[chains.base]
+# Set via env: BASE_RPC_URL, BASE_BUNDLER_URL, BASE_PAYMASTER_URL
+rpc_url      = ""
+chain_id     = 8453
+bundler_url  = ""
+paymaster_url = ""
+entry_point  = "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
+
+# For local dev / CI — use Base Sepolia
+# [chains.base]
+# rpc_url      = "https://sepolia.base.org"
+# chain_id     = 84532
+# bundler_url  = "https://api.pimlico.io/v2/84532/rpc?apikey=YOUR_KEY"
+# paymaster_url = "https://api.pimlico.io/v2/84532/rpc?apikey=YOUR_KEY"
+# entry_point  = "0x0000000071727De22E5E9d8BAf0edAc6f37da032"

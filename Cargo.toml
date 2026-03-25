@@ -1,0 +1,46 @@
+[workspace]
+members = ["server"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["GhostKey"]
+license = "MIT"
+
+[workspace.dependencies]
+# async runtime
+tokio = { version = "1", features = ["full"] }
+
+# http
+axum = { version = "0.7", features = ["macros"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["trace", "cors", "limit"] }
+
+# db
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "macros", "migrate", "chrono", "uuid"] }
+
+# serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# config
+figment = { version = "0.10", features = ["toml", "env"] }
+
+# errors
+thiserror = "2"
+anyhow = "1"
+
+# observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# auth
+jsonwebtoken = "9"
+
+# crypto / chain — added by Backend Engineer when implementing chain adapter (Phase 1)
+# alloy = { version = "1", features = ["providers", "rpc-types", "serde", "signers"] }
+
+# utils
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }

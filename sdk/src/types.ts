@@ -1,0 +1,67 @@
+// GhostKey SDK — Core Types
+// All public interfaces live here.
+
+export type AuthMethod = 'email' | 'wallet'
+
+export interface GhostKeyConfig {
+  apiUrl: string
+  chainId: number
+}
+
+export interface GhostKeyAccount {
+  accountId: string
+  address: string
+  chain: string
+  aaType: string
+  createdAt: string
+}
+
+export interface Intent {
+  target: string
+  calldata: string
+  value?: string  // wei as string — default "0"
+}
+
+export interface IntentResult {
+  intentId: string
+  status: IntentStatus
+  txHash: string | null
+  blockNumber: number | null
+}
+
+export type IntentStatus = 'pending' | 'submitted' | 'confirmed' | 'failed'
+
+export interface AuthResponse {
+  userId: string
+  token: string
+  expiresAt: string
+}
+
+export interface SessionKeyRequest {
+  accountId: string
+  allowedTargets: string[]
+  allowedSelectors: string[]
+  maxValueWei: string
+  ttlSeconds: number
+}
+
+export interface SessionKeyResponse {
+  sessionId: string
+  keyHash: string
+  expiresAt: string
+}
+
+// Error types — never throw raw Error strings
+export type GhostKeyErrorCode =
+  | 'not_authenticated'
+  | 'network_error'
+  | 'invalid_token'
+  | 'session_expired'
+  | 'intent_out_of_scope'
+  | 'rate_limited'
+  | 'unknown'
+
+export interface GhostKeyError {
+  code: GhostKeyErrorCode
+  message: string
+}

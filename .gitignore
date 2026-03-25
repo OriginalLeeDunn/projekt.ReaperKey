@@ -1,0 +1,50 @@
+# ── Secrets ──────────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+config.toml
+!config.toml.example
+
+# ── Rust ─────────────────────────────────────────────────────────────────────
+/target/
+**/*.rs.bk
+
+# ── Node / TypeScript SDK ────────────────────────────────────────────────────
+sdk/node_modules/
+sdk/dist/
+sdk/.turbo/
+sdk/coverage/
+*.tsbuildinfo
+
+# ── SQLite databases ─────────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+
+# ── Coverage / test artifacts ─────────────────────────────────────────────────
+tarpaulin-report.html
+lcov.info
+coverage/
+
+# ── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Editor ───────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Misc ─────────────────────────────────────────────────────────────────────
+dist/
+build/
+out/
