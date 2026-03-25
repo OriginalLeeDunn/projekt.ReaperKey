@@ -235,8 +235,6 @@ fn validate_calldata(calldata: &str) -> AppResult<()> {
     {
         Ok(())
     } else {
-        Err(AppError::BadRequest(
-            "invalid calldata: must be 0x-prefixed hex".into(),
-        ))
+        Err(AppError::InvalidCalldata)
     }
 }

@@ -8,6 +8,7 @@ export { useRecovery } from './hooks/useRecovery.js'
 export { generateSessionKey } from './crypto.js'
 export type { SessionKey } from './crypto.js'
 export { GhostKeyClient } from './client.js'
+export type { ApiResult } from './client.js'
 export type {
   GhostKeyConfig,
   GhostKeyAccount,

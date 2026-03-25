@@ -20,7 +20,7 @@ async fn recovery_initiate_returns_202() {
         .await;
 
     let res = server
-        .post("/recovery/init")
+        .post("/recovery/initiate")
         .json(&json!({ "account_address": TEST_ADDR }))
         .await;
 
@@ -43,7 +43,7 @@ async fn recovery_initiate_returns_202() {
 async fn recovery_unknown_address_returns_404() {
     let server = helpers::test_server().await;
     let res = server
-        .post("/recovery/init")
+        .post("/recovery/initiate")
         .json(&json!({ "account_address": "0x0000000000000000000000000000000000000001" }))
         .await;
     res.assert_status(StatusCode::NOT_FOUND);

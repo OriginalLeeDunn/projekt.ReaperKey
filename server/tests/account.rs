@@ -1,5 +1,5 @@
 //! Account integration tests
-//! Covers: SPEC-010, SPEC-012, SPEC-013
+//! Covers: SPEC-010, SPEC-011, SPEC-012, SPEC-013
 
 mod helpers;
 use axum::http::StatusCode;
@@ -24,6 +24,36 @@ async fn create_account_returns_201() {
     assert_eq!(body["address"], TEST_ADDR);
     assert_eq!(body["chain"], "base");
     assert_eq!(body["aa_type"], "kernel");
+}
+
+// SPEC-011: GET /account/:id returns all 5 required fields
+#[tokio::test]
+async fn get_account_returns_all_fields() {
+    let server = helpers::test_server().await;
+    let (token, _) = helpers::login(&server, "acct-fields@example.com").await;
+
+    let create_res = server
+        .post("/account/create")
+        .add_header("Authorization", format!("Bearer {token}"))
+        .json(&json!({ "chain": "base", "address": TEST_ADDR }))
+        .await;
+    create_res.assert_status(StatusCode::CREATED);
+    let account_id = create_res.json::<serde_json::Value>()["account_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let res = server
+        .get(&format!("/account/{account_id}"))
+        .add_header("Authorization", format!("Bearer {token}"))
+        .await;
+    res.assert_status_ok();
+    let body = res.json::<serde_json::Value>();
+    assert!(body["account_id"].is_string(), "account_id missing");
+    assert!(body["address"].is_string(), "address missing");
+    assert!(body["chain"].is_string(), "chain missing");
+    assert!(body["aa_type"].is_string(), "aa_type missing");
+    assert!(body["created_at"].is_string(), "created_at missing");
 }
 
 // SPEC-012: user B cannot fetch user A's account → 403

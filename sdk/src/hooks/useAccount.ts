@@ -7,17 +7,17 @@ export interface UseAccountReturn {
   account: GhostKeyAccount | null
   loading: boolean
   error: GhostKeyError | null
-  createAccount: (address: string, chain?: string) => Promise<void>
+  createAccount: (address: string) => Promise<void>
   fetchAccount: (accountId: string) => Promise<void>
 }
 
 export function useAccount(): UseAccountReturn {
-  const { client, config } = useGhostKey()
+  const { client } = useGhostKey()
   const [account, setAccount] = useState<GhostKeyAccount | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<GhostKeyError | null>(null)
 
-  async function createAccount(address: string, chain?: string): Promise<void> {
+  async function createAccount(address: string): Promise<void> {
     if (!client.isAuthenticated()) {
       setError({ code: 'not_authenticated', message: 'Login required' })
       return
@@ -26,8 +26,7 @@ export function useAccount(): UseAccountReturn {
     setLoading(true)
     setError(null)
 
-    const targetChain = chain ?? chainIdToName(config.chainId)
-    const result = await client.createAccount(targetChain, address)
+    const result = await client.createAccount(address)
 
     setLoading(false)
 
@@ -61,12 +60,4 @@ export function useAccount(): UseAccountReturn {
   }
 
   return { account, loading, error, createAccount, fetchAccount }
-}
-
-function chainIdToName(chainId: number): string {
-  const map: Record<number, string> = {
-    8453: 'base',
-    84532: 'base-sepolia',
-  }
-  return map[chainId] ?? 'base'
 }

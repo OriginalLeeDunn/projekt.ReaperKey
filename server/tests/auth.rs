@@ -136,4 +136,9 @@ async fn login_rate_limit_returns_429() {
 
     res.assert_status(StatusCode::TOO_MANY_REQUESTS);
     assert_eq!(res.json::<serde_json::Value>()["error"], "rate_limited");
+    let retry_after = res.headers().get("retry-after");
+    assert!(
+        retry_after.is_some(),
+        "Retry-After header must be present on 429"
+    );
 }
