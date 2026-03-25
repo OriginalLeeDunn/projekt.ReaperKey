@@ -20,7 +20,9 @@ impl DbAccount {
             address: self.address,
             chain: self.chain,
             aa_type: self.aa_type,
-            created_at: Utc.timestamp_opt(self.created_at, 0).single()
+            created_at: Utc
+                .timestamp_opt(self.created_at, 0)
+                .single()
                 .unwrap_or_else(Utc::now),
         })
     }

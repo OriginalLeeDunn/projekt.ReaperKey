@@ -1,4 +1,8 @@
-use axum::{extract::{Path, State}, http::StatusCode, Json};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    Json,
+};
 use chrono::Utc;
 use uuid::Uuid;
 
@@ -28,7 +32,10 @@ pub async fn create(
     .await?;
 
     if let Some(account) = existing {
-        return Ok((StatusCode::OK, Json(account.into_response().map_err(|_| AppError::Internal)?)));
+        return Ok((
+            StatusCode::OK,
+            Json(account.into_response().map_err(|_| AppError::Internal)?),
+        ));
     }
 
     let account_id = Uuid::new_v4();
@@ -45,13 +52,16 @@ pub async fn create(
     .await?;
 
     tracing::info!(account_id = %account_id, chain = %body.chain, "account.create");
-    Ok((StatusCode::CREATED, Json(AccountResponse {
-        account_id,
-        address: body.address,
-        chain: body.chain,
-        aa_type: "kernel".to_string(),
-        created_at: Utc::now(),
-    })))
+    Ok((
+        StatusCode::CREATED,
+        Json(AccountResponse {
+            account_id,
+            address: body.address,
+            chain: body.chain,
+            aa_type: "kernel".to_string(),
+            created_at: Utc::now(),
+        }),
+    ))
 }
 
 /// GET /account/:id — SPEC-011, SPEC-012
@@ -75,11 +85,16 @@ pub async fn fetch(
         return Err(AppError::Forbidden); // SPEC-012
     }
 
-    Ok(Json(account.into_response().map_err(|_| AppError::Internal)?))
+    Ok(Json(
+        account.into_response().map_err(|_| AppError::Internal)?,
+    ))
 }
 
 fn validate_evm_address(addr: &str) -> AppResult<()> {
-    if addr.len() == 42 && addr.starts_with("0x") && addr[2..].chars().all(|c| c.is_ascii_hexdigit()) {
+    if addr.len() == 42
+        && addr.starts_with("0x")
+        && addr[2..].chars().all(|c| c.is_ascii_hexdigit())
+    {
         Ok(())
     } else {
         Err(AppError::BadRequest(format!("invalid EVM address: {addr}")))

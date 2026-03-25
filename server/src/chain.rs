@@ -33,12 +33,16 @@ impl ChainAdapter {
             "params": [user_op, self.entry_point],
             "id": 1
         });
-        let res: Value = self.client
+        let res: Value = self
+            .client
             .post(&self.paymaster_url)
             .json(&payload)
-            .send().await?
-            .json().await?;
-        res.get("result").cloned()
+            .send()
+            .await?
+            .json()
+            .await?;
+        res.get("result")
+            .cloned()
             .ok_or_else(|| anyhow::anyhow!("paymaster error: {:?}", res.get("error")))
     }
 
@@ -51,11 +55,14 @@ impl ChainAdapter {
             "params": [user_op, self.entry_point],
             "id": 1
         });
-        let res: Value = self.client
+        let res: Value = self
+            .client
             .post(&self.bundler_url)
             .json(&payload)
-            .send().await?
-            .json().await?;
+            .send()
+            .await?
+            .json()
+            .await?;
         res.get("result")
             .and_then(|r| r.as_str())
             .map(|s| s.to_string())
@@ -70,11 +77,14 @@ impl ChainAdapter {
             "params": [user_op_hash],
             "id": 1
         });
-        let res: Value = self.client
+        let res: Value = self
+            .client
             .post(&self.bundler_url)
             .json(&payload)
-            .send().await?
-            .json().await?;
+            .send()
+            .await?
+            .json()
+            .await?;
         Ok(res.get("result").cloned())
     }
 }

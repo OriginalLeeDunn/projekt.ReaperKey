@@ -38,7 +38,7 @@ pub enum AuthMethod {
 impl AuthMethod {
     pub fn as_str(&self) -> &'static str {
         match self {
-            AuthMethod::Email  => "email",
+            AuthMethod::Email => "email",
             AuthMethod::Wallet => "wallet",
         }
     }

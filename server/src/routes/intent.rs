@@ -1,4 +1,8 @@
-use axum::{extract::{Path, State}, http::StatusCode, Json};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    Json,
+};
 use chrono::Utc;
 use uuid::Uuid;
 
@@ -17,7 +21,10 @@ pub async fn execute(
     Json(body): Json<ExecuteIntentRequest>,
 ) -> AppResult<(StatusCode, Json<IntentResponse>)> {
     // Rate limit per user (SPEC-035)
-    if !state.rate_limiter.check(&format!("intent:{}", auth.user_id)) {
+    if !state
+        .rate_limiter
+        .check(&format!("intent:{}", auth.user_id))
+    {
         return Err(AppError::RateLimited);
     }
 
@@ -43,7 +50,10 @@ pub async fn execute(
     }
 
     // SPEC-023: reject value above session limit
-    let requested_value: u128 = body.value.parse().map_err(|_| AppError::BadRequest("invalid value".into()))?;
+    let requested_value: u128 = body
+        .value
+        .parse()
+        .map_err(|_| AppError::BadRequest("invalid value".into()))?;
     if requested_value > session.max_value() {
         return Err(AppError::ValueExceedsLimit);
     }
@@ -52,12 +62,11 @@ pub async fn execute(
     validate_calldata(&body.calldata)?;
 
     // Verify session's account belongs to requesting user
-    let account_row: Option<(String,)> = sqlx::query_as(
-        "SELECT user_id FROM accounts WHERE id = ?",
-    )
-    .bind(&session.account_id)
-    .fetch_optional(&state.db)
-    .await?;
+    let account_row: Option<(String,)> =
+        sqlx::query_as("SELECT user_id FROM accounts WHERE id = ?")
+            .bind(&session.account_id)
+            .fetch_optional(&state.db)
+            .await?;
 
     let (account_user_id,) = account_row.ok_or(AppError::NotFound)?;
     if Uuid::parse_str(&account_user_id).map_err(|_| AppError::Internal)? != auth.user_id {
@@ -95,12 +104,15 @@ pub async fn execute(
         submit_to_bundler(db, chain_adapter, id_str, user_op).await;
     });
 
-    Ok((StatusCode::ACCEPTED, Json(IntentResponse {
-        intent_id,
-        status: IntentStatus::Pending,
-        tx_hash: None,
-        block_number: None,
-    })))
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(IntentResponse {
+            intent_id,
+            status: IntentStatus::Pending,
+            tx_hash: None,
+            block_number: None,
+        }),
+    ))
 }
 
 /// GET /intent/:id/status — SPEC-031, SPEC-032, SPEC-033
@@ -135,7 +147,9 @@ pub async fn status(
         return Err(AppError::Forbidden);
     }
 
-    Ok(Json(intent.into_response().map_err(|_| AppError::Internal)?))
+    Ok(Json(
+        intent.into_response().map_err(|_| AppError::Internal)?,
+    ))
 }
 
 /// Background task: submit signed UserOp to Pimlico, poll for receipt, update DB.
@@ -176,7 +190,8 @@ async fn submit_to_bundler(
                 let block = receipt["receipt"]["blockNumber"]
                     .as_str()
                     .and_then(|s| i64::from_str_radix(s.trim_start_matches("0x"), 16).ok());
-                update_intent_status(&db, &intent_id, "confirmed", Some(&user_op_hash), block).await;
+                update_intent_status(&db, &intent_id, "confirmed", Some(&user_op_hash), block)
+                    .await;
                 tracing::info!(intent_id = %intent_id, "intent.confirmed");
                 return;
             }
@@ -193,7 +208,13 @@ async fn submit_to_bundler(
     update_intent_status(&db, &intent_id, "failed", Some(&user_op_hash), None).await;
 }
 
-async fn update_intent_status(db: &crate::db::Db, id: &str, status: &str, tx_hash: Option<&str>, block: Option<i64>) {
+async fn update_intent_status(
+    db: &crate::db::Db,
+    id: &str,
+    status: &str,
+    tx_hash: Option<&str>,
+    block: Option<i64>,
+) {
     let now = Utc::now().timestamp();
     let _ = sqlx::query(
         "UPDATE intents SET status = ?, tx_hash = ?, block_number = ?, updated_at = ? WHERE id = ?",
@@ -212,6 +233,8 @@ fn validate_calldata(calldata: &str) -> AppResult<()> {
     if data.is_empty() || (data.len() % 2 == 0 && data.chars().all(|c| c.is_ascii_hexdigit())) {
         Ok(())
     } else {
-        Err(AppError::BadRequest("invalid calldata: must be 0x-prefixed hex".into()))
+        Err(AppError::BadRequest(
+            "invalid calldata: must be 0x-prefixed hex".into(),
+        ))
     }
 }
