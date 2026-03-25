@@ -1,5 +1,5 @@
 // useAccount — fetches or creates the user's smart account
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import type { GhostKeyAccount, GhostKeyError } from '../types.js'
 import { useGhostKey } from '../provider.js'
 

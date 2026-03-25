@@ -230,7 +230,7 @@ async fn update_intent_status(
 
 fn validate_calldata(calldata: &str) -> AppResult<()> {
     let data = calldata.strip_prefix("0x").unwrap_or(calldata);
-    if data.is_empty() || (data.len() % 2 == 0 && data.chars().all(|c| c.is_ascii_hexdigit())) {
+    if data.is_empty() || (data.len().is_multiple_of(2) && data.chars().all(|c| c.is_ascii_hexdigit())) {
         Ok(())
     } else {
         Err(AppError::BadRequest(
