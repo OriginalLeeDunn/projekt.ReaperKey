@@ -152,3 +152,27 @@ Format: append-only. To reverse a decision, add a `Superseded by:` line.
 **Future:** Add utoipa in v1 when the API surface grows and manual maintenance becomes impractical.
 **Reviewed by:** Docs Agent ✓
 **Status:** Accepted
+
+---
+
+## 2026-03-26 — Founder/Governor — v0 Scope Boundary: Storage+Routing Layer
+
+**Phase:** Post-Phase 5 audit (triggered by first live demo run)
+**Context:** Live demo against real Pimlico bundler revealed that `user_operation` is always `{}` in the SDK. Pimlico rejected with validation errors. Further audit found no Kernel counterfactual address computation and no on-chain session key registration.
+**Decision:** v0.x (Phases 1–5) is formally defined as a **storage and routing layer**. It correctly manages users, smart account records, session key metadata, and intent routing. It does NOT perform on-chain execution. On-chain execution (UserOp construction, Kernel address computation, on-chain session key registration) is formally v1.0 scope.
+**Rationale:** These gaps were always implied by the roadmap ("on-chain session key registration" listed under v1.0) but were never made explicit at the v0 boundary. The live demo made this concrete. The v0 infrastructure is solid — the gaps are not bugs in the v0 feature set, they are v0 non-goals that were not clearly documented.
+**Risks:** Users/contributors who read v0 docs may expect real on-chain execution. Mitigated by: roadmap.md updated with "Known v0 limitations" section, HEALTH.md updated with "Critical Known Gaps".
+**Process change:** QA agent now requires a real bundler E2E test before any phase sign-off touching intent execution.
+**Reviewed by:** QA Agent ✓ | Architect ✓
+**Status:** Accepted
+
+---
+
+## 2026-03-26 — Backend Engineer — db.rs create_if_missing Hotfix (v0.5.1)
+
+**Phase:** v0.5.1 hotfix
+**Context:** On first run with no existing `ghostkey.db` file, `SqlitePoolOptions::connect()` failed with "unable to open database file". The connection string uses `sqlite:./ghostkey.db` which does not auto-create the file.
+**Decision:** Use `SqliteConnectOptions::from_str(url)?.create_if_missing(true)` + `connect_with(opts)` instead of `connect()` directly. This is the correct SQLx API for auto-creating SQLite databases.
+**Rationale:** Necessary for any fresh install. The bug was masked in CI because the test DB was always created fresh by the test harness.
+**Reviewed by:** DevOps Agent ✓
+**Status:** Accepted

@@ -71,3 +71,18 @@ Coverage gates block regressions before they ship.
 - Mocking the database is prohibited — use real SQLite in tests.
 - Test names must describe the scenario, not the implementation.
 - Flaky tests must be fixed or deleted — never skipped permanently.
+- **Any phase that touches intent execution requires a real bundler E2E test before sign-off.** Wiremock mocks are insufficient for phase completion involving Pimlico integration. (Added 2026-03-26 — post-mortem from GAP-001 discovery.)
+
+---
+
+## Known Gaps (as of v0.5.1 — 2026-03-26)
+
+These were discovered during the first live demo run. All tests passed (81/81) because bundler interaction was fully mocked. A real Pimlico bundler rejected the actual requests.
+
+| Gap | Area | Description | v1.0 Fix |
+|-----|------|-------------|----------|
+| GAP-001 | Intent | `user_operation` is always `{}` — SDK never builds/signs a real UserOp | SDK UserOp construction |
+| GAP-002 | Account | No Kernel counterfactual address computation — user manually provides address | ZeroDev SDK integration |
+| GAP-003 | On-chain | Session keys DB-only, not registered in Kernel module | On-chain registration |
+
+**Lesson:** Mocking infrastructure is valid for unit/integration tests. But phase sign-off for any feature that claims on-chain integration MUST include at least one test against real testnet infrastructure.

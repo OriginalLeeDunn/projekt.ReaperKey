@@ -21,6 +21,7 @@ Append-only — to record a rollback, add a new entry with type `ROLLBACK`.
 | 5 | 2026-03-26 | v0.4.0 | 1d7c6b7 Phase 4: CORS, security headers, request ID, structured logging, health 503, deployment docs | RELEASE | ✓ all green | Health: ok | #69–#73 |
 | 6 | 2026-03-26 | v0.4.1 | fffc660 Phase 4 validation gaps: security headers, request ID, CORS, health 503, internal error isolation tests | PATCH | ✓ all green | Health: ok | None |
 | 7 | 2026-03-26 | v0.5.0 | 39e4dd6 Phase 5: open source launch — docs, E2E tests, release workflow, SDK v1.0.0 | RELEASE | ✓ all green | Health: ok | #79–#88 |
+| 8 | 2026-03-26 | v0.5.1 | hotfix: db.rs create_if_missing + config.toml.example host + post-audit doc update | HOTFIX | ✓ all green | Health: ok, GAP-001/002/003 logged | GAP-001–003 |
 
 ---
 

@@ -17,7 +17,7 @@
 #   GHOSTKEY__SERVER__PORT=9090
 
 [server]
-host = "0.0.0.0"   # bind address — use 127.0.0.1 for local-only
+host = "127.0.0.1"   # localhost-only for dev; use 0.0.0.0 for Docker/production
 port = 8080
 # Allowed CORS origins — comma-separated. Restrict in production.
 cors_origins = ["http://localhost:3000"]

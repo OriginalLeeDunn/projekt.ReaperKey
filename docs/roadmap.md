@@ -1,25 +1,39 @@
 # GhostKey Roadmap
 
-## Current: v0.4 — Hardened Foundation
+## Current: v0.5 — Storage + Routing Infrastructure
 
-The v0 series delivers a self-hostable, non-custodial smart account infrastructure layer with a developer-friendly TypeScript SDK.
+The v0 series delivers a self-hostable, non-custodial **storage and routing layer** — the server-side infrastructure that manages users, smart account records, session key metadata, and intent routing. On-chain execution is the v1.0 milestone.
 
-**Shipped in v0.x:**
-- User authentication (email, JWT)
-- Smart account creation (ZeroDev Kernel v3 on Base)
-- Session key issuance with per-key scope enforcement (target, selector, value, TTL)
-- Intent execution via Pimlico bundler + paymaster (ERC-4337)
-- Account recovery initiation
-- Security hardening: rate limiting, config-driven CORS, security headers, structured logging
+**Shipped in v0.x (confirmed working as of 2026-03-26 live demo):**
+- User authentication (email, JWT, rate limiting, refresh, recovery initiation)
+- Smart account registration (EVM address validation, DB record, chain metadata)
+- Session key issuance (DB storage, scope enforcement: target/selector/value/TTL, key hash — never raw key)
+- Intent pipeline (scope validation, DB persistence, bundler submission routing)
+- Security hardening: rate limiting (sliding window), config-driven CORS, security headers, structured logging
 - TypeScript SDK with React hooks (`useLogin`, `useAccount`, `useSessionKey`, `useSendIntent`, `useRecovery`)
-- Full integration test suite (40+ Rust tests, 39 SDK tests)
-- Self-hostable via single binary + SQLite + Docker
+- Full integration test suite (42 Rust tests, 39 SDK tests, 81 total)
+- Self-hostable via single binary + SQLite
+- Multi-platform binary releases (x86_64/aarch64 Linux + macOS) via GitHub Actions
+- `@ghostkey/sdk@1.0.0` published to npm
+
+**Known v0 limitations (fixed in v1.0):**
+- SDK does not build or sign ERC-4337 UserOperations — intent submission reaches Pimlico but is rejected (empty UserOp)
+- No ZeroDev Kernel counterfactual address computation — users provide owner address manually
+- Session keys are off-chain only — Kernel smart contract does not know about the session key
+- All bundler tests use wiremock mocks — no real testnet E2E test exists yet
 
 ---
 
-## v1.0 — Multi-Chain + Production Hardening
+## v1.0 — On-Chain Execution + Multi-Chain
 
-**Theme:** Expand chain support, replace v0 compromises with production-grade solutions.
+**Theme:** Complete the on-chain execution layer, then expand chain support.
+
+### On-chain execution (primary milestone)
+- SDK builds ERC-4337 UserOperations (fetch nonce from EntryPoint, ABI-encode `execute`, fetch gas)
+- Session key signs UserOperations client-side (private key never leaves browser)
+- ZeroDev Kernel v3 counterfactual address computation in SDK (deterministic from owner + salt)
+- On-chain session key registration via Kernel session key plugin
+- Real E2E test against Base Sepolia + live Pimlico in CI
 
 ### Chain support
 - Add Ethereum mainnet

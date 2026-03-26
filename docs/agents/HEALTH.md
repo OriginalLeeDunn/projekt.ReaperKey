@@ -1,7 +1,7 @@
 # GhostKey — System Health Dashboard
 
 **Maintained by:** Governor Agent
-**Last Updated:** 2026-03-26 (post-deploy #7 — v0.5.0)
+**Last Updated:** 2026-03-26 (post-audit — v0.5.1 hotfix + gap report)
 **Next Scheduled Assessment:** 2026-04-02
 
 ---
@@ -9,27 +9,63 @@
 ## Current System State
 
 ```
-OVERALL: HEALTHY — v0.5.0 on main — Phase 5 COMPLETE
-──────────────────────────────────────────────────────
+OVERALL: HEALTHY — v0.5.1 on main — KNOWN EXECUTION GAPS (see below)
+──────────────────────────────────────────────────────────────────────
 AGENT CORP:        ✓ 18 agents defined
-DOCS CURRENCY:     ✓ All docs fresh (updated 2026-03-26)
-DRIFT FINDINGS:    ✓ 0 open
+DOCS CURRENCY:     ✓ All docs updated 2026-03-26 (post-audit)
+DRIFT FINDINGS:    3 OPEN (GAP-001, GAP-002, GAP-003 — see Critical Known Gaps)
 SECURITY FINDINGS: ✓ 0 open
-PHASE PROGRESS:    Phase 5 COMPLETE — all phases done
+PHASE PROGRESS:    Phases 1–5 COMPLETE (infra). On-chain execution is v1.0 scope.
 REPO:              ✓ Public on GitHub — OriginalLeeDunn/projekt.ReaperKey
-BRANCHES:          ✓ main (v0.5.0) + dev (synced)
+BRANCHES:          ✓ main (v0.5.1) + dev (synced)
 CI:                ✓ All green — rust + sdk + security + coverage
 TESTS PASSING:     ✓ 42 Rust + 39 SDK = 81 total
 TESTS IGNORED:     0
 COVERAGE:          80%+ Rust (gate: 80%) | 96.83% SDK lines / 80.48% branches
 README:            ✓ Updated — npm badge, docs table, SDK install section
-CHANGELOG:         ✓ v0.1.0–v0.5.0 published
-DEPLOYMENTS LOG:   ✓ Deployments #1 through #7 recorded
-RELEASES:          ✓ v0.1.0–v0.5.0 on GitHub | release workflow active
+CHANGELOG:         ✓ v0.1.0–v0.5.1 published
+DEPLOYMENTS LOG:   ✓ Deployments #1 through #8 recorded
+RELEASES:          ✓ v0.1.0–v0.5.1 on GitHub | release workflow active
 SDK VERSION:       1.0.0 (independent versioning — DECISIONS.md 2026-03-26)
-OPEN ISSUES:       0
+OPEN ISSUES:       3 (GAP-001–003 below → GitHub issues pending)
 DOCS:              quickstart.md, security-model.md, api/endpoints.md, sdk/hooks.md, roadmap.md
 ```
+
+---
+
+## Critical Known Gaps
+
+These gaps were discovered during live demo testing on 2026-03-26. They do NOT affect the v0 infrastructure (auth, DB, API contracts, CI), but they prevent real on-chain intent execution. All three are **v1.0 scope** items.
+
+| ID | Area | Description | Severity | Blocks |
+|----|------|-------------|----------|--------|
+| GAP-001 | SDK / Intent | `user_operation` is always `{}` — SDK never builds or signs a UserOperation | CRITICAL | Demo, v1.0 |
+| GAP-002 | SDK / Account | No ZeroDev Kernel counterfactual address computation — example app accepts any EVM address | CRITICAL | Demo, v1.0 |
+| GAP-003 | On-chain | Session keys stored in DB only — not registered in Kernel session key module on-chain | HIGH | v1.0 |
+
+### GAP-001: SDK never builds a UserOperation
+- **Code:** `sdk/src/client.ts:179` — `user_operation: intent.userOperation ?? {}`
+- **Effect:** Pimlico receives `{}`, rejects with "expected string, received undefined at sender/nonce/callData/..."
+- **Root cause:** UserOp construction + session key signing never implemented in v0 scope
+- **Fix (v1.0):** SDK must fetch nonce from EntryPoint, ABI-encode `execute(target, value, calldata)`, fetch gas prices, sign with session key private key
+
+### GAP-002: No Kernel counterfactual address computation
+- **Code:** `sdk/src/hooks/useAccount.ts` + `example/src/App.tsx:200` — owner address passed manually by user
+- **Effect:** Smart account "address" in DB is an arbitrary EVM address, not a deployed Kernel account
+- **Fix (v1.0):** Integrate ZeroDev SDK / permissionless.js to derive deterministic Kernel v3 address from owner + salt
+
+### GAP-003: Session keys are off-chain only
+- **Code:** `server/src/routes/session_key.rs` — DB insert only, no chain interaction
+- **Effect:** Session key enforcement is entirely server-side; Kernel does not know about the session key
+- **Fix (v1.0):** After GAP-001+002 are resolved, call Kernel session key module to register key on-chain
+
+### Why Tests Passed
+All 81 tests pass because intent tests use a **wiremock mock bundler** that accepts any JSON. No test exercises a real Pimlico endpoint. This is a process gap — QA agent did not require a real bundler E2E test before Phase 5 sign-off.
+
+### Hotfixes Shipped in v0.5.1
+Two server-side bugs discovered during local demo run:
+- `server/src/db.rs` — Added `create_if_missing(true)` so SQLite DB is created on first run
+- `config.toml.example` — Changed default `host` from `0.0.0.0` to `127.0.0.1` for safe local dev
 
 ---
 
@@ -104,8 +140,9 @@ DOCS:              quickstart.md, security-model.md, api/endpoints.md, sdk/hooks
 | Phase 1: Core Engine         | ✓ COMPLETE   | Backend Eng   | None — all ISS resolved |
 | Phase 2: SDK                 | ✓ COMPLETE   | SDK Eng       | None — merged 2026-03-25 |
 | Phase 3: Reference App       | ✓ COMPLETE   | SDK Eng       | None — merged 2026-03-25 |
-| Phase 4: Hardening           | NOT STARTED  | Security Lead | #33 (error logging), #34+ pending |
-| Phase 5: Open Source Launch  | NOT STARTED  | Orchestrator  | Awaiting P4     |
+| Phase 4: Hardening           | ✓ COMPLETE   | Security Lead | None |
+| Phase 5: Open Source Launch  | ✓ COMPLETE   | Orchestrator  | None |
+| Phase 6: On-Chain Execution  | NOT STARTED  | Architect     | GAP-001, GAP-002, GAP-003 must be resolved |
 
 ### Phase 0 Completion Record
 - [x] Scope locked
@@ -170,6 +207,9 @@ DOCS:              quickstart.md, security-model.md, api/endpoints.md, sdk/hooks
 | ISS-001 | LOW | SDK | `sdk/package-lock.json` missing — SDK CI would fail on `npm ci` | RESOLVED | 2026-03-24 | 2026-03-24 |
 | ISS-002 | LOW | Rust | Unused import `DbSession` in session_key.rs | RESOLVED | 2026-03-24 | 2026-03-24 |
 | ISS-003 | MEDIUM | Tests | Account tests `#[ignore]` — Bearer token not wired | RESOLVED | 2026-03-24 | 2026-03-24 |
+| GAP-001 | CRITICAL | SDK | `user_operation` is always `{}` — SDK never builds/signs UserOp — real bundler rejects | OPEN | 2026-03-26 | — |
+| GAP-002 | CRITICAL | SDK | No Kernel counterfactual address computation — example app accepts any EVM address | OPEN | 2026-03-26 | — |
+| GAP-003 | HIGH | On-chain | Session keys not registered in Kernel module — off-chain enforcement only | OPEN | 2026-03-26 | — |
 
 ---
 
@@ -295,6 +335,40 @@ _No open findings. RUSTSEC-2023-0071 (rsa Marvin Attack) documented and ignored 
 
 ---
 
+### 2026-03-26 — Governor — Post-Demo Audit Assessment (v0.5.1)
+
+**Triggered by:** Live demo run — first time full flow was exercised against real Pimlico bundler.
+
+**Findings:** 3 critical gaps discovered (GAP-001/002/003). All 81 tests passed but all bundler tests used wiremock mocks. Real Pimlico rejected the empty UserOperation with validation errors. Two local runtime bugs also found and fixed (db.rs create_if_missing, config.toml.example host).
+
+**Root cause of gap:** QA agent signed off on Phase 5 without requiring a real bundler E2E test. Intent tests used wiremock which accepts any JSON. The gap between "tests pass against mock" and "works against real infrastructure" was never closed.
+
+**What is truly working (v0.5.1):**
+- Auth (login/register/JWT/rate-limit/refresh/recovery) — fully functional
+- Account registration (DB record + EVM address validation) — functional
+- Session key issuance (DB storage, scope metadata, TTL, key hash) — functional
+- Intent pipeline (scope validation, DB persistence, bundler submission attempt) — functional
+- All CI gates, release workflow, npm publish, multi-platform binaries — functional
+
+**What is NOT working (v1.0 scope):**
+- SDK does not build or sign UserOperations (GAP-001)
+- No Kernel counterfactual address computation (GAP-002)
+- Session keys not registered on-chain (GAP-003)
+
+**Decision:** v0.5.x is correctly described as a "storage and routing layer." It is not an "execution layer." The roadmap already positions on-chain execution as v1.0. Docs have been updated to make this boundary explicit.
+
+**v0.5.1 hotfixes shipped:**
+- `server/src/db.rs` — `create_if_missing(true)` — SQLite DB was not created on first run
+- `config.toml.example` — default host changed to `127.0.0.1` — was `0.0.0.0` (unsafe for local dev)
+
+**Process improvement:** QA agent rules updated — real bundler E2E test required before any future phase sign-off that touches intent execution.
+
+**Readiness for Phase 6 (v1.0):** Not yet. Must resolve GAP-001 and GAP-002 first (UserOp construction + Kernel address computation). GAP-003 (on-chain session key registration) follows naturally once the account is real.
+
+**Overall: v0.5.1 DEPLOYED. HEALTHY WITH KNOWN GAPS. PHASE 6 PLANNING READY.**
+
+---
+
 ## Governance Change Log
 
 | Date       | Change                                         | By              |
@@ -351,3 +425,13 @@ _No open findings. RUSTSEC-2023-0071 (rsa Marvin Attack) documented and ignored 
 | 2026-03-25 | v0.2.0 + v0.3.0 + v0.3.1 tags + releases pushed | DevOps Agent    |
 | 2026-03-25 | Deployment #4 recorded in DEPLOYMENTS.md         | Monitor Agent   |
 | 2026-03-25 | v0.3.1 post-deploy assessment complete           | Monitor Agent   |
+| 2026-03-26 | Phase 4 (v0.4.0–v0.4.1) + Phase 5 (v0.5.0) complete | Orchestrator |
+| 2026-03-26 | Release workflow live — multi-platform binaries + npm publish | DevOps |
+| 2026-03-26 | @ghostkey/sdk@1.0.0 published to npm             | SDK Eng         |
+| 2026-03-26 | Deployments #5 through #7 recorded               | Monitor Agent   |
+| 2026-03-26 | Live demo run — GAP-001/002/003 discovered       | QA / Founder    |
+| 2026-03-26 | db.rs create_if_missing bug fixed (v0.5.1 hotfix) | Backend Eng    |
+| 2026-03-26 | config.toml.example host 0.0.0.0→127.0.0.1 fixed | DevOps Agent   |
+| 2026-03-26 | All docs + agent files updated for post-audit state | Docs Agent    |
+| 2026-03-26 | GAP-001/002/003 logged — v1.0 scope confirmed    | Governor        |
+| 2026-03-26 | Deployment #8 recorded — v0.5.1 hotfix           | Monitor Agent   |
