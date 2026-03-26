@@ -24,7 +24,8 @@ pub async fn issue(
             .await?;
 
     let (account_user_id,) = account_row.ok_or(AppError::NotFound)?;
-    let account_owner = Uuid::parse_str(&account_user_id).map_err(|_| AppError::Internal)?;
+    let account_owner = Uuid::parse_str(&account_user_id)
+        .map_err(|_| AppError::Internal("account user_id parse failed".into()))?;
     if account_owner != auth.user_id {
         return Err(AppError::Forbidden);
     }

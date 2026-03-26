@@ -50,7 +50,7 @@ Fast, correct, minimal.
 | POST   | /session-key/issue      | session_key     |
 | POST   | /intent/execute         | intent          |
 | GET    | /intent/:id/status      | intent          |
-| POST   | /recovery/init          | recovery        |
+| POST   | /recovery/initiate      | recovery        |
 
 ---
 

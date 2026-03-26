@@ -5,15 +5,24 @@ use ghostkey::{config::Config, db, routes};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "ghostkey=debug,tower_http=debug".into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        .init();
-
+    // Load config first so log_format is available before initialising tracing.
     let config = Config::load()?;
+
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| "ghostkey=debug,tower_http=debug".into());
+
+    // #62: JSON format for production; pretty format for local dev.
+    if config.server.log_format == "json" {
+        tracing_subscriber::registry()
+            .with(env_filter)
+            .with(tracing_subscriber::fmt::layer().json())
+            .init();
+    } else {
+        tracing_subscriber::registry()
+            .with(env_filter)
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+    }
     tracing::info!(host = %config.server.host, port = %config.server.port, "starting ghostkey-server");
 
     let pool = db::connect(&config.database.url).await?;

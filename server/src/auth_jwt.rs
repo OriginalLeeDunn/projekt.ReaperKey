@@ -29,7 +29,7 @@ pub fn issue(
         &claims,
         &EncodingKey::from_secret(secret.as_bytes()),
     )
-    .map_err(|_| AppError::Internal)?;
+    .map_err(|e| AppError::Internal(format!("jwt encode failed: {e}")))?;
     Ok((token, expires_at))
 }
 
