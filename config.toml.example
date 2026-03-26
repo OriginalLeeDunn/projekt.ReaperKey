@@ -19,6 +19,10 @@
 [server]
 host = "0.0.0.0"   # bind address — use 127.0.0.1 for local-only
 port = 8080
+# Allowed CORS origins — comma-separated. Restrict in production.
+cors_origins = ["http://localhost:3000"]
+# Log format: "pretty" for local dev, "json" for production / log aggregation.
+log_format = "pretty"
 
 [database]
 url = "sqlite:./ghostkey.db"   # SQLite path; sqlite::memory: for ephemeral

@@ -69,6 +69,18 @@ cp config.toml.example config.toml
 make dev
 ```
 
+### Run with Docker
+
+```bash
+cp .env.example .env
+# Fill in JWT_SECRET, BASE_BUNDLER_URL, BASE_PAYMASTER_URL in .env
+
+docker compose up -d
+curl http://localhost:8080/health
+```
+
+See [`docs/deployment.md`](docs/deployment.md) for the full production deployment guide.
+
 ### Run tests
 
 ```bash

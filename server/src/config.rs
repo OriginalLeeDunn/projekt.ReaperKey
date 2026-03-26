@@ -18,6 +18,12 @@ pub struct ServerConfig {
     pub host: String,
     #[serde(default = "default_port")]
     pub port: u16,
+    /// Allowed CORS origins. Defaults to localhost:3000 for local dev.
+    #[serde(default = "default_cors_origins")]
+    pub cors_origins: Vec<String>,
+    /// Log format: "pretty" (default) or "json" (for production/structured logging).
+    #[serde(default = "default_log_format")]
+    pub log_format: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -45,6 +51,13 @@ pub struct ChainConfig {
     pub bundler_url: String,
     pub paymaster_url: String,
     pub entry_point: String,
+}
+
+fn default_cors_origins() -> Vec<String> {
+    vec!["http://localhost:3000".to_string()]
+}
+fn default_log_format() -> String {
+    "pretty".to_string()
 }
 
 fn default_host() -> String {

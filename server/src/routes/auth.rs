@@ -38,7 +38,11 @@ pub async fn login(
     .await?;
 
     let (user_id, is_new) = match existing {
-        Some(u) => (u.user_id().map_err(|_| AppError::Internal)?, false),
+        Some(u) => (
+            u.user_id()
+                .map_err(|_| AppError::Internal("user_id parse failed".into()))?,
+            false,
+        ),
         None => {
             let id = Uuid::new_v4();
             sqlx::query(
