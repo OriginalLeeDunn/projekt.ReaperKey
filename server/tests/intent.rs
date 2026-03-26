@@ -5,6 +5,7 @@ mod helpers;
 use axum::http::StatusCode;
 use chrono::Utc;
 use serde_json::json;
+use uuid::Uuid;
 use wiremock::{
     matchers::{method, path},
     Mock, MockServer, ResponseTemplate,
@@ -133,42 +134,31 @@ async fn get_intent_status_returns_intent() {
     );
 }
 
-// SPEC-032 (confirmed): after DB update to confirmed + tx_hash, status returns confirmed fields
+// SPEC-032 (confirmed): directly insert confirmed intent, status returns confirmed fields
+// Note: avoids execute_intent to prevent race with background bundler task under slow CI.
 #[tokio::test]
 async fn get_intent_status_confirmed_returns_confirmed_fields() {
-    let bundler = mock_bundler().await;
-    let (server, pool) =
-        helpers::test_server_and_db_with_bundler(&bundler.uri(), &bundler.uri()).await;
+    let (server, pool) = helpers::test_server_and_db().await;
     let (token, session_id) = setup_intent(&server, "intent-confirmed@example.com").await;
 
-    let execute_res = server
-        .post("/intent/execute")
-        .add_header("Authorization", format!("Bearer {token}"))
-        .json(&json!({
-            "session_id": session_id,
-            "target": TEST_ADDR,
-            "calldata": VALID_CALLDATA,
-            "value": "0",
-            "user_operation": {}
-        }))
-        .await;
-    let intent_id = execute_res.json::<serde_json::Value>()["intent_id"]
-        .as_str()
-        .unwrap()
-        .to_string();
-
-    // Directly update the DB to simulate a confirmed state
+    // Insert a confirmed intent directly — no background task race
+    let intent_id = Uuid::new_v4();
     let fake_tx_hash = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
     let now = Utc::now().timestamp();
     sqlx::query(
-        "UPDATE intents SET status = 'confirmed', tx_hash = ?, block_number = 42, updated_at = ? WHERE id = ?",
+        "INSERT INTO intents (id, session_id, chain, target, calldata, value_wei, status, tx_hash, block_number, created_at, updated_at)
+         VALUES (?, ?, 'base', ?, ?, '0', 'confirmed', ?, 42, ?, ?)",
     )
+    .bind(intent_id.to_string())
+    .bind(&session_id)
+    .bind(TEST_ADDR)
+    .bind(VALID_CALLDATA)
     .bind(fake_tx_hash)
     .bind(now)
-    .bind(&intent_id)
+    .bind(now)
     .execute(&pool)
     .await
-    .expect("DB update");
+    .expect("DB insert");
 
     let status_res = server
         .get(&format!("/intent/{intent_id}/status"))
