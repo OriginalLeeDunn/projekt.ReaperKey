@@ -40,8 +40,8 @@ pub enum AppError {
     #[error("database error")]
     Database(#[from] sqlx::Error),
 
-    #[error("internal error")]
-    Internal,
+    #[error("internal error: {0}")]
+    Internal(String),
 }
 
 impl IntoResponse for AppError {
@@ -76,7 +76,7 @@ impl IntoResponse for AppError {
                     }
                     AppError::InvalidCalldata => (StatusCode::BAD_REQUEST, "invalid_calldata"),
                     AppError::Database(_) => (StatusCode::INTERNAL_SERVER_ERROR, "database_error"),
-                    AppError::Internal => (StatusCode::INTERNAL_SERVER_ERROR, "internal_error"),
+                    AppError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "internal_error"),
                 };
                 (status, Json(json!({ "error": code }))).into_response()
             }

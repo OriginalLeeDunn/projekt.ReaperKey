@@ -30,7 +30,7 @@ Updated by: Architect Agent + DevOps Agent
 ║  ├── POST /session-key/issue     → session key generation               ║
 ║  ├── POST /intent/execute        → intent submission + routing           ║
 ║  ├── GET  /intent/:id/status     → execution status                      ║
-║  └── POST /recovery/init         → recovery flow initiation              ║
+║  └── POST /recovery/initiate     → recovery flow initiation              ║
 ╚══════════════════════════════╦═══════════════════════════════════════════╝
                                ║
          ┌─────────────────────┼──────────────────────┐

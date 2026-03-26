@@ -1,0 +1,31 @@
+version: "3.9"
+
+services:
+  server:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ghostkey-data:/data
+    environment:
+      # Required secrets — override via .env or shell env
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - BASE_RPC_URL=${BASE_RPC_URL:-https://sepolia.base.org}
+      - BASE_BUNDLER_URL=${BASE_BUNDLER_URL:?BASE_BUNDLER_URL is required}
+      - BASE_PAYMASTER_URL=${BASE_PAYMASTER_URL:?BASE_PAYMASTER_URL is required}
+      # Server config
+      - GHOSTKEY__SERVER__CORS_ORIGINS=${CORS_ORIGINS:-["http://localhost:3000"]}
+      - GHOSTKEY__SERVER__LOG_FORMAT=json
+      - GHOSTKEY__DATABASE__URL=sqlite:///data/ghostkey.db
+      - GHOSTKEY__CHAINS__BASE__CHAIN_ID=${CHAIN_ID:-84532}
+      - GHOSTKEY__CHAINS__BASE__ENTRY_POINT=0x0000000071727De22E5E9d8BAf0edAc6f37da032
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  ghostkey-data:

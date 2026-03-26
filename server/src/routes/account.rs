@@ -34,7 +34,11 @@ pub async fn create(
     if let Some(account) = existing {
         return Ok((
             StatusCode::OK,
-            Json(account.into_response().map_err(|_| AppError::Internal)?),
+            Json(
+                account
+                    .into_response()
+                    .map_err(|_| AppError::Internal("account uuid parse failed".into()))?,
+            ),
         ));
     }
 
@@ -80,14 +84,15 @@ pub async fn fetch(
 
     let account = account.ok_or(AppError::NotFound)?;
 
-    let owner_id = Uuid::parse_str(&account.user_id).map_err(|_| AppError::Internal)?;
+    let owner_id = Uuid::parse_str(&account.user_id)
+        .map_err(|_| AppError::Internal("account user_id parse failed".into()))?;
     if owner_id != auth.user_id {
         return Err(AppError::Forbidden); // SPEC-012
     }
 
-    Ok(Json(
-        account.into_response().map_err(|_| AppError::Internal)?,
-    ))
+    Ok(Json(account.into_response().map_err(|_| {
+        AppError::Internal("account uuid parse failed".into())
+    })?))
 }
 
 fn validate_evm_address(addr: &str) -> AppResult<()> {

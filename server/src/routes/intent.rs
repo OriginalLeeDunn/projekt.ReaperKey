@@ -69,7 +69,10 @@ pub async fn execute(
             .await?;
 
     let (account_user_id,) = account_row.ok_or(AppError::NotFound)?;
-    if Uuid::parse_str(&account_user_id).map_err(|_| AppError::Internal)? != auth.user_id {
+    if Uuid::parse_str(&account_user_id)
+        .map_err(|_| AppError::Internal("account user_id parse failed".into()))?
+        != auth.user_id
+    {
         return Err(AppError::Forbidden);
     }
 
@@ -144,13 +147,16 @@ pub async fn status(
     .await?;
 
     let (owner_id,) = owner_row.ok_or(AppError::NotFound)?;
-    if Uuid::parse_str(&owner_id).map_err(|_| AppError::Internal)? != auth.user_id {
+    if Uuid::parse_str(&owner_id)
+        .map_err(|_| AppError::Internal("intent owner_id parse failed".into()))?
+        != auth.user_id
+    {
         return Err(AppError::Forbidden);
     }
 
-    Ok(Json(
-        intent.into_response().map_err(|_| AppError::Internal)?,
-    ))
+    Ok(Json(intent.into_response().map_err(|_| {
+        AppError::Internal("intent uuid parse failed".into())
+    })?))
 }
 
 /// Background task: submit signed UserOp to Pimlico, poll for receipt, update DB.
