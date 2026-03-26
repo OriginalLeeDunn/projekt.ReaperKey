@@ -48,7 +48,7 @@ jobs:
         uses: cargo-bins/cargo-binstall@main
 
       - name: Install cargo-audit + cargo-tarpaulin (pre-built binaries)
-        run: cargo binstall cargo-audit cargo-tarpaulin --no-confirm --locked
+        run: cargo binstall cargo-audit cargo-tarpaulin --no-confirm --force
 
       - name: Dependency audit
         run: cargo audit
