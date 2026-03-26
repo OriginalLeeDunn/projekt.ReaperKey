@@ -3,6 +3,7 @@
 > Non-custodial Web3 wallet abstraction SDK. Rust backend · TypeScript SDK · ERC-4337 smart accounts on Base.
 
 [![CI](https://github.com/OriginalLeeDunn/projekt.ReaperKey/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/OriginalLeeDunn/projekt.ReaperKey/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@ghostkey/sdk)](https://www.npmjs.com/package/@ghostkey/sdk)
 
 ---
 
@@ -42,6 +43,16 @@ ReaperKey lets apps give users smart contract wallets (ERC-4337) without ever to
 │  EntryPoint v0.7 · ZeroDev Kernel v3 · Pimlico       │
 └─────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Install the SDK
+
+```bash
+npm install @ghostkey/sdk
+```
+
+See the [quickstart guide](docs/quickstart.md) for a step-by-step integration walkthrough.
 
 ---
 
@@ -121,15 +132,30 @@ make ci          # everything (same as CI pipeline)
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/auth/login` | — | Login / register (email or wallet) |
-| POST | `/auth/refresh` | — | Refresh JWT token |
+| POST | `/auth/login` | — | Login / register (email) |
+| POST | `/auth/refresh` | JWT | Refresh JWT token |
 | POST | `/account/create` | JWT | Create ERC-4337 smart account |
 | GET | `/account/:id` | JWT | Fetch account details |
 | POST | `/session-key/issue` | JWT | Issue scoped session key |
-| POST | `/intent/execute` | — | Submit signed UserOperation |
-| GET | `/intent/:id/status` | — | Poll intent status |
-| POST | `/recovery/initiate` | — | Initiate account recovery |
+| POST | `/intent/execute` | JWT | Submit intent for on-chain execution |
+| GET | `/intent/:id/status` | JWT | Poll intent status |
+| POST | `/recovery/initiate` | JWT | Initiate account recovery |
 | GET | `/health` | — | Health check |
+
+Full reference: [`docs/api/endpoints.md`](docs/api/endpoints.md)
+
+---
+
+## Documentation
+
+| Doc | Description |
+|-----|-------------|
+| [Quickstart](docs/quickstart.md) | 5-minute integration guide |
+| [API Reference](docs/api/endpoints.md) | All endpoints, request/response shapes, error codes |
+| [SDK Hooks](docs/sdk/hooks.md) | `useLogin`, `useAccount`, `useSessionKey`, `useSendIntent` |
+| [Security Model](docs/security-model.md) | Threat model, OWASP coverage, non-custodial guarantees |
+| [Deployment](docs/deployment.md) | Production checklist, Docker, reverse proxy |
+| [Roadmap](docs/roadmap.md) | v1 and beyond |
 
 ---
 
@@ -143,9 +169,9 @@ See [`docs/agents/AGENTS.md`](docs/agents/AGENTS.md) for the full agent governan
 
 ## Security
 
-Server never handles, receives, or stores private keys. See [`docs/agents/audit/COMPLIANCE.md`](docs/agents/audit/COMPLIANCE.md) for the full non-custodial constraint specification.
+Server never handles, receives, or stores private keys. See [`docs/security-model.md`](docs/security-model.md) for the full threat model and OWASP coverage.
 
-To report a security issue, open a GitHub issue marked `[SECURITY]`.
+To report a security vulnerability, open a GitHub issue marked `[SECURITY]` before public disclosure.
 
 ---
 

@@ -37,11 +37,21 @@ Before spawning any agent:
 ## Phase Checklist
 
 - [x] Phase 0: Alignment complete, chain selected (Base), legal posture confirmed, test specs written, tooling defined
-- [ ] Phase 1: Rust backend skeleton, user/session model, intent pipeline
-- [ ] Phase 2: TypeScript SDK, login flow, account fetch, send-intent
-- [ ] Phase 3: Reference app end-to-end, recovery flow
-- [ ] Phase 4: Rate limiting, structured logging, error handling, test coverage
+- [x] Phase 1: Rust backend skeleton, user/session model, intent pipeline (v0.1.0–v0.3.0)
+- [x] Phase 2: TypeScript SDK, login flow, account fetch, send-intent (v0.2.0–v0.3.0)
+- [x] Phase 3: Reference app end-to-end, recovery flow (v0.3.0)
+- [x] Phase 4: Rate limiting, structured logging, error handling, test coverage (v0.4.1)
 - [ ] Phase 5: Docs published, README, security model, quickstart, roadmap
+  - [x] E2E-001 + E2E-002 tests (`server/tests/e2e.rs`)
+  - [x] SPEC-100–103 SDK labels + localStorage non-write assertion
+  - [x] `docs/quickstart.md`
+  - [x] `docs/security-model.md`
+  - [x] `docs/api/endpoints.md`
+  - [x] `docs/sdk/hooks.md`
+  - [x] `docs/roadmap.md`
+  - [x] `.github/workflows/release.yml` (multi-platform binary + npm publish)
+  - [x] `sdk/package.json` version → 1.0.0 + publishConfig
+  - [ ] README.md — project overview, install, quickstart link
 
 ---
 
