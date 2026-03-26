@@ -35,7 +35,7 @@ sha2 = "0.10"
 dashmap = "6"
 
 # http client — Pimlico bundler/paymaster calls
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 # calldata hex validation
 hex = "0.4"

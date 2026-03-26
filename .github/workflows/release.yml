@@ -65,7 +65,8 @@ jobs:
           ARCHIVE_NAME="${BINARY_NAME}-${VERSION}-${TARGET}.tar.gz"
 
           mkdir -p dist
-          cp "server/target/${TARGET}/release/${BINARY_NAME}" dist/
+          # Workspace root target dir (not server/target/ — Cargo workspace puts output here)
+          cp "target/${TARGET}/release/${BINARY_NAME}" dist/
           cp README.md config.toml.example dist/ 2>/dev/null || true
 
           cd dist
@@ -115,6 +116,7 @@ jobs:
         run: npm run build
 
       - name: Publish
+        if: ${{ secrets.NPM_TOKEN != '' }}
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
