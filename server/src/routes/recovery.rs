@@ -13,7 +13,7 @@ pub struct RecoveryInitRequest {
     pub account_address: String,
 }
 
-/// POST /recovery/init — SPEC-040
+/// POST /recovery/initiate — SPEC-040
 /// Initiates recovery for an account. Does NOT grant server key access.
 #[tracing::instrument(skip(state, body))]
 pub async fn init(

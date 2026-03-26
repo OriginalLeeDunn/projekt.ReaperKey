@@ -5,6 +5,7 @@ mod helpers;
 use axum::http::StatusCode;
 use chrono::Utc;
 use serde_json::json;
+use uuid::Uuid;
 use wiremock::{
     matchers::{method, path},
     Mock, MockServer, ResponseTemplate,
@@ -133,42 +134,31 @@ async fn get_intent_status_returns_intent() {
     );
 }
 
-// SPEC-032 (confirmed): after DB update to confirmed + tx_hash, status returns confirmed fields
+// SPEC-032 (confirmed): directly insert confirmed intent, status returns confirmed fields
+// Note: avoids execute_intent to prevent race with background bundler task under slow CI.
 #[tokio::test]
 async fn get_intent_status_confirmed_returns_confirmed_fields() {
-    let bundler = mock_bundler().await;
-    let (server, pool) =
-        helpers::test_server_and_db_with_bundler(&bundler.uri(), &bundler.uri()).await;
+    let (server, pool) = helpers::test_server_and_db().await;
     let (token, session_id) = setup_intent(&server, "intent-confirmed@example.com").await;
 
-    let execute_res = server
-        .post("/intent/execute")
-        .add_header("Authorization", format!("Bearer {token}"))
-        .json(&json!({
-            "session_id": session_id,
-            "target": TEST_ADDR,
-            "calldata": VALID_CALLDATA,
-            "value": "0",
-            "user_operation": {}
-        }))
-        .await;
-    let intent_id = execute_res.json::<serde_json::Value>()["intent_id"]
-        .as_str()
-        .unwrap()
-        .to_string();
-
-    // Directly update the DB to simulate a confirmed state
+    // Insert a confirmed intent directly — no background task race
+    let intent_id = Uuid::new_v4();
     let fake_tx_hash = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
     let now = Utc::now().timestamp();
     sqlx::query(
-        "UPDATE intents SET status = 'confirmed', tx_hash = ?, block_number = 42, updated_at = ? WHERE id = ?",
+        "INSERT INTO intents (id, session_id, chain, target, calldata, value_wei, status, tx_hash, block_number, created_at, updated_at)
+         VALUES (?, ?, 'base', ?, ?, '0', 'confirmed', ?, 42, ?, ?)",
     )
+    .bind(intent_id.to_string())
+    .bind(&session_id)
+    .bind(TEST_ADDR)
+    .bind(VALID_CALLDATA)
     .bind(fake_tx_hash)
     .bind(now)
-    .bind(&intent_id)
+    .bind(now)
     .execute(&pool)
     .await
-    .expect("DB update");
+    .expect("DB insert");
 
     let status_res = server
         .get(&format!("/intent/{intent_id}/status"))
@@ -188,7 +178,7 @@ async fn get_intent_status_confirmed_returns_confirmed_fields() {
     );
 }
 
-// SPEC-033 (failed): after DB update to failed, status returns failed
+// SPEC-033 (failed): after DB update to failed, status returns failed + reason
 #[tokio::test]
 async fn get_intent_status_failed_returns_failed() {
     let bundler = mock_bundler().await;
@@ -214,12 +204,14 @@ async fn get_intent_status_failed_returns_failed() {
 
     // Directly update the DB to simulate a failed state
     let now = Utc::now().timestamp();
-    sqlx::query("UPDATE intents SET status = 'failed', updated_at = ? WHERE id = ?")
-        .bind(now)
-        .bind(&intent_id)
-        .execute(&pool)
-        .await
-        .expect("DB update");
+    sqlx::query(
+        "UPDATE intents SET status = 'failed', reason = 'execution_reverted', updated_at = ? WHERE id = ?",
+    )
+    .bind(now)
+    .bind(&intent_id)
+    .execute(&pool)
+    .await
+    .expect("DB update");
 
     let status_res = server
         .get(&format!("/intent/{intent_id}/status"))
@@ -229,6 +221,10 @@ async fn get_intent_status_failed_returns_failed() {
     status_res.assert_status_ok();
     let body = status_res.json::<serde_json::Value>();
     assert_eq!(body["status"], "failed");
+    assert_eq!(
+        body["reason"], "execution_reverted",
+        "SPEC-033: reason must be execution_reverted"
+    );
 }
 
 // SPEC-022: expired session key → 401 with session_expired
@@ -330,7 +326,7 @@ async fn execute_intent_invalid_calldata_returns_400() {
     assert_eq!(res.json::<serde_json::Value>()["error"], "invalid_calldata");
 }
 
-// SPEC-035: no auth → 401
+// No auth → 401 (auth guard test, not SPEC-035)
 #[tokio::test]
 async fn execute_intent_no_auth_returns_401() {
     let server = helpers::test_server().await;
@@ -347,6 +343,49 @@ async fn execute_intent_no_auth_returns_401() {
         .await;
 
     res.assert_status(StatusCode::UNAUTHORIZED);
+}
+
+// SPEC-035: intent rate limiting — 11th intent (limit: 10/60s) → 429 + Retry-After
+#[tokio::test]
+async fn execute_intent_rate_limited_returns_429() {
+    let (server, _pool) = helpers::test_server_and_db().await;
+    let (token, session_id) = setup_intent(&server, "intent-ratelimit@example.com").await;
+
+    let payload = json!({
+        "session_id": session_id,
+        "target": TEST_ADDR,
+        "calldata": VALID_CALLDATA,
+        "value": "0",
+        "user_operation": {}
+    });
+
+    // Fire 10 intents — all should succeed (rate limit: 10/60s)
+    for _ in 0..10 {
+        let res = server
+            .post("/intent/execute")
+            .add_header("Authorization", format!("Bearer {token}"))
+            .json(&payload)
+            .await;
+        res.assert_status(StatusCode::ACCEPTED);
+    }
+
+    // 11th intent — must be rate limited
+    let res = server
+        .post("/intent/execute")
+        .add_header("Authorization", format!("Bearer {token}"))
+        .json(&payload)
+        .await;
+
+    res.assert_status(StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(
+        res.json::<serde_json::Value>()["error"],
+        "rate_limited",
+        "SPEC-035: error code must be rate_limited"
+    );
+    assert!(
+        res.headers().get("retry-after").is_some(),
+        "SPEC-035: Retry-After header must be present on 429"
+    );
 }
 
 // Unknown session → 404
@@ -370,7 +409,7 @@ async fn execute_intent_unknown_session_returns_404() {
     res.assert_status(StatusCode::NOT_FOUND);
 }
 
-// Target outside allowed scope → 403
+// SPEC-021: target outside allowed scope → 403 intent_out_of_scope
 #[tokio::test]
 async fn execute_intent_out_of_scope_target_returns_403() {
     let server = helpers::test_server().await;
@@ -389,9 +428,14 @@ async fn execute_intent_out_of_scope_target_returns_403() {
         .await;
 
     res.assert_status(StatusCode::FORBIDDEN);
+    assert_eq!(
+        res.json::<serde_json::Value>()["error"],
+        "intent_out_of_scope",
+        "SPEC-021: error code must be intent_out_of_scope"
+    );
 }
 
-// Value above session max → 403
+// SPEC-023: value above session max → 403 value_exceeds_session_limit
 #[tokio::test]
 async fn execute_intent_value_exceeds_limit_returns_403() {
     let server = helpers::test_server().await;
@@ -410,4 +454,9 @@ async fn execute_intent_value_exceeds_limit_returns_403() {
         .await;
 
     res.assert_status(StatusCode::FORBIDDEN);
+    assert_eq!(
+        res.json::<serde_json::Value>()["error"],
+        "value_exceeds_session_limit",
+        "SPEC-023: error code must be value_exceeds_session_limit"
+    );
 }

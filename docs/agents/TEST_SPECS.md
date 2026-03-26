@@ -248,10 +248,11 @@ OWNER:  server/tests/intent.rs
 
 ### SPEC-035: Intent Rate Limiting
 ```
-GIVEN:  same account submits 20 intents within 60 seconds
-WHEN:   21st intent submission
+GIVEN:  same account submits 10 intents within 60 seconds (limit: 10/60s per user)
+WHEN:   11th intent submission
 THEN:   - HTTP 429
-        - Retry-After header present
+        - body: { error: "rate_limited" }
+        - Retry-After: 60 header present
 OWNER:  server/tests/intent.rs
 ```
 
@@ -262,7 +263,7 @@ OWNER:  server/tests/intent.rs
 ### SPEC-040: Initiate Recovery Flow
 ```
 GIVEN:  user cannot authenticate (lost credentials)
-WHEN:   POST /recovery/init { account_address: "0x..." }
+WHEN:   POST /recovery/initiate { account_address: "0x..." }
 THEN:   - HTTP 202
         - response contains { recovery_id, method, instructions }
         - recovery record created with status "initiated"

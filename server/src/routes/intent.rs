@@ -111,6 +111,7 @@ pub async fn execute(
             status: IntentStatus::Pending,
             tx_hash: None,
             block_number: None,
+            reason: None,
         }),
     ))
 }
@@ -123,7 +124,7 @@ pub async fn status(
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<IntentResponse>> {
     let intent: Option<DbIntent> = sqlx::query_as(
-        "SELECT id, session_id, chain, target, calldata, value_wei, status, tx_hash, block_number, created_at, updated_at
+        "SELECT id, session_id, chain, target, calldata, value_wei, status, tx_hash, block_number, reason, created_at, updated_at
          FROM intents WHERE id = ?",
     )
     .bind(id.to_string())
@@ -164,7 +165,15 @@ async fn submit_to_bundler(
         Ok(op) => op,
         Err(e) => {
             tracing::warn!(intent_id = %intent_id, error = %e, "paymaster sponsorship failed");
-            update_intent_status(&db, &intent_id, "failed", None, None).await;
+            update_intent_status(
+                &db,
+                &intent_id,
+                "failed",
+                None,
+                None,
+                Some("execution_reverted"),
+            )
+            .await;
             return;
         }
     };
@@ -174,12 +183,28 @@ async fn submit_to_bundler(
         Ok(h) => h,
         Err(e) => {
             tracing::warn!(intent_id = %intent_id, error = %e, "bundler submission failed");
-            update_intent_status(&db, &intent_id, "failed", None, None).await;
+            update_intent_status(
+                &db,
+                &intent_id,
+                "failed",
+                None,
+                None,
+                Some("execution_reverted"),
+            )
+            .await;
             return;
         }
     };
 
-    update_intent_status(&db, &intent_id, "submitted", Some(&user_op_hash), None).await;
+    update_intent_status(
+        &db,
+        &intent_id,
+        "submitted",
+        Some(&user_op_hash),
+        None,
+        None,
+    )
+    .await;
     tracing::info!(intent_id = %intent_id, user_op_hash = %user_op_hash, "intent.bundler_submitted");
 
     // Poll for receipt (30 attempts × 2s = 60s max)
@@ -190,8 +215,15 @@ async fn submit_to_bundler(
                 let block = receipt["receipt"]["blockNumber"]
                     .as_str()
                     .and_then(|s| i64::from_str_radix(s.trim_start_matches("0x"), 16).ok());
-                update_intent_status(&db, &intent_id, "confirmed", Some(&user_op_hash), block)
-                    .await;
+                update_intent_status(
+                    &db,
+                    &intent_id,
+                    "confirmed",
+                    Some(&user_op_hash),
+                    block,
+                    None,
+                )
+                .await;
                 tracing::info!(intent_id = %intent_id, "intent.confirmed");
                 return;
             }
@@ -205,7 +237,15 @@ async fn submit_to_bundler(
 
     // Timed out
     tracing::warn!(intent_id = %intent_id, "intent.poll_timeout");
-    update_intent_status(&db, &intent_id, "failed", Some(&user_op_hash), None).await;
+    update_intent_status(
+        &db,
+        &intent_id,
+        "failed",
+        Some(&user_op_hash),
+        None,
+        Some("execution_reverted"),
+    )
+    .await;
 }
 
 async fn update_intent_status(
@@ -214,14 +254,16 @@ async fn update_intent_status(
     status: &str,
     tx_hash: Option<&str>,
     block: Option<i64>,
+    reason: Option<&str>,
 ) {
     let now = Utc::now().timestamp();
     let _ = sqlx::query(
-        "UPDATE intents SET status = ?, tx_hash = ?, block_number = ?, updated_at = ? WHERE id = ?",
+        "UPDATE intents SET status = ?, tx_hash = ?, block_number = ?, reason = ?, updated_at = ? WHERE id = ?",
     )
     .bind(status)
     .bind(tx_hash)
     .bind(block)
+    .bind(reason)
     .bind(now)
     .bind(id)
     .execute(db)
