@@ -1,7 +1,11 @@
 //! Security integration tests — run against every endpoint
 //! Covers: SPEC-200, SPEC-201, SPEC-202, SPEC-203
+//! Phase 4 validation: security headers, request ID, CORS, internal error isolation
 
 mod helpers;
+use axum::body::to_bytes;
+use axum::response::IntoResponse;
+use ghostkey::error::AppError;
 use serde_json::json;
 
 // SPEC-202: oversized payload returns 413
@@ -59,4 +63,112 @@ async fn health_check_has_no_private_key() {
     let body = res.text();
     let private_key_pattern = regex::Regex::new(r"0x[0-9a-fA-F]{64}").unwrap();
     assert!(!private_key_pattern.is_match(&body));
+}
+
+// #69: security headers present on every response
+#[tokio::test]
+async fn response_includes_required_security_headers() {
+    let server = helpers::test_server().await;
+    let res = server.get("/health").await;
+
+    assert_eq!(
+        res.headers()
+            .get("x-content-type-options")
+            .map(|v| v.to_str().unwrap()),
+        Some("nosniff"),
+        "X-Content-Type-Options: nosniff must be set"
+    );
+    assert_eq!(
+        res.headers()
+            .get("x-frame-options")
+            .map(|v| v.to_str().unwrap()),
+        Some("DENY"),
+        "X-Frame-Options: DENY must be set"
+    );
+    assert_eq!(
+        res.headers()
+            .get("referrer-policy")
+            .map(|v| v.to_str().unwrap()),
+        Some("strict-origin-when-cross-origin"),
+        "Referrer-Policy: strict-origin-when-cross-origin must be set"
+    );
+}
+
+// #70: X-Request-ID header present and is a valid UUID on every response
+#[tokio::test]
+async fn response_includes_valid_x_request_id_header() {
+    let server = helpers::test_server().await;
+    let res = server.get("/health").await;
+
+    let request_id = res
+        .headers()
+        .get("x-request-id")
+        .expect("x-request-id header must be present")
+        .to_str()
+        .expect("x-request-id must be valid UTF-8");
+
+    assert!(
+        uuid::Uuid::parse_str(request_id).is_ok(),
+        "x-request-id must be a valid UUID, got: {request_id}"
+    );
+}
+
+// #71: CORS — approved origin gets Access-Control-Allow-Origin header
+#[tokio::test]
+async fn cors_allows_configured_origin() {
+    let server = helpers::test_server().await;
+    let res = server
+        .get("/health")
+        .add_header("Origin", "http://localhost:3000")
+        .await;
+
+    let acao = res
+        .headers()
+        .get("access-control-allow-origin")
+        .expect("configured origin must receive access-control-allow-origin header")
+        .to_str()
+        .unwrap();
+    assert_eq!(acao, "http://localhost:3000");
+}
+
+// #71: CORS — unapproved origin does NOT get Access-Control-Allow-Origin header
+#[tokio::test]
+async fn cors_rejects_unapproved_origin() {
+    let server = helpers::test_server().await;
+    let res = server
+        .get("/health")
+        .add_header("Origin", "http://evil.com")
+        .await;
+
+    assert!(
+        res.headers().get("access-control-allow-origin").is_none(),
+        "unapproved origin must not receive access-control-allow-origin header"
+    );
+}
+
+// #73: AppError::Internal returns 500 + "internal_error" — cause must NOT leak to client
+#[tokio::test]
+async fn internal_error_hides_cause_from_client() {
+    let secret_cause = "jwt_encode_failed: hmac key is null — do not expose";
+    let err = AppError::Internal(secret_cause.to_string());
+    let response = err.into_response();
+
+    assert_eq!(
+        response.status(),
+        axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+        "Internal error must return 500"
+    );
+
+    let body_bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = String::from_utf8(body_bytes.to_vec()).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+
+    assert_eq!(
+        json["error"], "internal_error",
+        "error code must be internal_error, got: {body}"
+    );
+    assert!(
+        !body.contains(secret_cause),
+        "cause must not leak to client response: {body}"
+    );
 }

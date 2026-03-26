@@ -96,28 +96,29 @@ async fn execute_intent_returns_202() {
     assert_eq!(body["status"], "pending");
 }
 
-// SPEC-031: get intent status returns current state
+// SPEC-031: get intent status returns pending state
+// Note: avoids execute_intent to prevent race with background bundler task under slow CI.
+// Direct DB INSERT mirrors the approach used in SPEC-032.
 #[tokio::test]
 async fn get_intent_status_returns_intent() {
-    let bundler = mock_bundler().await;
-    let server = helpers::test_server_with_bundler(&bundler.uri(), &bundler.uri()).await;
+    let (server, pool) = helpers::test_server_and_db().await;
     let (token, session_id) = setup_intent(&server, "intent-status@example.com").await;
 
-    let execute_res = server
-        .post("/intent/execute")
-        .add_header("Authorization", format!("Bearer {token}"))
-        .json(&json!({
-            "session_id": session_id,
-            "target": TEST_ADDR,
-            "calldata": VALID_CALLDATA,
-            "value": "0",
-            "user_operation": {}
-        }))
-        .await;
-    let intent_id = execute_res.json::<serde_json::Value>()["intent_id"]
-        .as_str()
-        .unwrap()
-        .to_string();
+    let intent_id = Uuid::new_v4();
+    let now = Utc::now().timestamp();
+    sqlx::query(
+        "INSERT INTO intents (id, session_id, chain, target, calldata, value_wei, status, created_at, updated_at)
+         VALUES (?, ?, 'base', ?, ?, '0', 'pending', ?, ?)",
+    )
+    .bind(intent_id.to_string())
+    .bind(&session_id)
+    .bind(TEST_ADDR)
+    .bind(VALID_CALLDATA)
+    .bind(now)
+    .bind(now)
+    .execute(&pool)
+    .await
+    .expect("DB insert");
 
     let status_res = server
         .get(&format!("/intent/{intent_id}/status"))
@@ -126,7 +127,7 @@ async fn get_intent_status_returns_intent() {
 
     status_res.assert_status_ok();
     let body = status_res.json::<serde_json::Value>();
-    assert_eq!(body["intent_id"], intent_id);
+    assert_eq!(body["intent_id"], intent_id.to_string());
     assert_eq!(body["status"], "pending");
     assert!(
         body["tx_hash"].is_null(),

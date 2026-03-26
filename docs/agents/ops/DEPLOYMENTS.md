@@ -1,7 +1,7 @@
 # ReaperKey — Deployment Registry
 
 **Maintained by:** Monitor Agent + DevOps Agent
-**Last Updated:** 2026-03-25 (post-deploy #4)
+**Last Updated:** 2026-03-26 (post-deploy #6)
 **Source:** https://github.com/OriginalLeeDunn/projekt.ReaperKey
 
 This is the authoritative record of all deployments to `main`.
@@ -18,27 +18,29 @@ Append-only — to record a rollback, add a new entry with type `ROLLBACK`.
 | 2 | 2026-03-25 | v0.2.0 | efce0e5 Phase 2: SDK — hooks, mappers, intent tests | RELEASE | ✓ all green | Health: ok | #18, #19, #20, #21 |
 | 3 | 2026-03-25 | v0.3.0 | 1b23d76 Phase 3: reference app, useRecovery, generateSessionKey, auth bug fix | RELEASE | ✓ all green | Health: ok | #33 |
 | 4 | 2026-03-25 | v0.3.1 | 4a5aac1 Pre-Phase 4: validation gap fixes #36–#43 | PATCH | ✓ all green | Health: ok | #33 |
+| 5 | 2026-03-26 | v0.4.0 | 1d7c6b7 Phase 4: CORS, security headers, request ID, structured logging, health 503, deployment docs | RELEASE | ✓ all green | Health: ok | #69–#73 |
+| 6 | 2026-03-26 | v0.4.1 | fffc660 Phase 4 validation gaps: security headers, request ID, CORS, health 503, internal error isolation tests | PATCH | ✓ all green | Health: ok | None |
 
 ---
 
 ## Current Production State
 
 ```
-Environment:   v0.3.1 — merged to main 2026-03-25
-Branch:        main (commit 4a5aac1)
-Last CI Run:   2026-03-25 — all green
+Environment:   v0.4.1 — merged to main 2026-03-26
+Branch:        main (commit fffc660)
+Last CI Run:   2026-03-26 — all green
                ✓ rust (fmt + clippy + test + audit)
-               ✓ security (SPEC-200, SPEC-201, SPEC-202, SPEC-203)
+               ✓ security (SPEC-200, SPEC-201, SPEC-202, SPEC-203 + Phase 4 hardening tests)
                ✓ sdk (vitest 38 passing, coverage 96.83%, eslint clean)
-               ✓ coverage — 87.18%+ Rust (gate: 80%)
-Phase:         Phase 3 COMPLETE — Phase 4 READY
-Tests passing: 32 Rust (7 auth + 4 security + 4 account + 3 session_key + 2 recovery
-                       + 12 intent [incl. SPEC-022/031/032/033] + 1 health check [wait wrong count])
+               ✓ coverage — 80%+ Rust (gate: 80%)
+Phase:         Phase 4 COMPLETE — Phase 5 READY
+Tests passing: 40 Rust (7 auth + 9 security + 4 account + 3 session_key + 2 recovery
+                       + 13 intent + 2 health)
                + 38 SDK (15 client + 19 hook tests + 4 crypto tests)
 Tests ignored: 0
-Coverage:      87.18%+ Rust | 96.83% SDK lines, 100% funcs, 80.48% branches
-Releases:      v0.1.0 + v0.2.0 + v0.3.0 + v0.3.1 published on GitHub
-Open issues:   1 (#33 — Phase 4 scope)
+Coverage:      80%+ Rust | 96.83% SDK lines, 100% funcs, 80.48% branches
+Releases:      v0.1.0–v0.4.1 published on GitHub
+Open issues:   0
 ```
 
 ---
