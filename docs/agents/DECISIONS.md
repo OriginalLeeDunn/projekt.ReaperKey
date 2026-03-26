@@ -96,3 +96,21 @@ Format: append-only. To reverse a decision, add a `Superseded by:` line.
 **Risks:** Slightly slower iteration if CI is slow. Mitigated by fast Rust test suite (< 30s).
 **Reviewed by:** Orchestrator ✓
 **Status:** Accepted
+
+---
+
+## 2026-03-26 — Founder — Stateless JWT: No Token Denylist for v0
+
+**Phase:** Post-Phase 3 (Validation)
+**Context:** SPEC-003 specified that refreshing a token must invalidate the old token. Validation (issue #54) surfaced that current implementation uses stateless JWTs — old tokens remain valid until their `exp` claim expires (1-hour TTL). Implementing invalidation would require a token denylist (DB or Redis lookup on every authenticated request).
+**Decision:** Accept stateless JWT behavior for v0. Do not implement a token denylist. SPEC-003 updated to remove the old-token-invalidation requirement.
+**Rationale:**
+- 1-hour TTL limits blast radius of a leaked JWT to 60 minutes
+- Non-custodial architecture provides a second security layer: even with a valid JWT, an attacker cannot move funds they don't control; session keys are separately scoped per-target/selector/value
+- Token denylist adds per-request DB overhead, infrastructure complexity, and a new failure mode (denylist unavailable → auth broken)
+- Stateless JWT is standard practice for short-lived tokens in non-custodial systems
+**Risks:** If a JWT is stolen, attacker has up to 1 hour of API access. Mitigated by: short TTL, session key scope enforcement, rate limiting, non-custodial key model.
+**Future:** Revisit for v1 if compliance requirements (e.g., immediate revocation on logout) demand it. Adding a denylist is backwards-compatible — no API changes required.
+**Reviewed by:** Security Lead ✓ | Founder ✓
+**Status:** Accepted
+**Supersedes:** SPEC-003 old-token-invalidation requirement (issue #54)
