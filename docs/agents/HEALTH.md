@@ -1,32 +1,32 @@
 # GhostKey — System Health Dashboard
 
 **Maintained by:** Governor Agent
-**Last Updated:** 2026-03-25 (post-deploy #4 — v0.3.1)
-**Next Scheduled Assessment:** 2026-04-01
+**Last Updated:** 2026-03-26 (post-deploy #6 — v0.4.1)
+**Next Scheduled Assessment:** 2026-04-02
 
 ---
 
 ## Current System State
 
 ```
-OVERALL: HEALTHY — v0.3.1 on main — Phase 3 COMPLETE — Phase 4 READY
+OVERALL: HEALTHY — v0.4.1 on main — Phase 4 COMPLETE — Phase 5 READY
 ──────────────────────────────────────────────────────────────────────
 AGENT CORP:        ✓ 18 agents defined
-DOCS CURRENCY:     ✓ All docs fresh (updated 2026-03-25)
+DOCS CURRENCY:     ✓ All docs fresh (updated 2026-03-26)
 DRIFT FINDINGS:    ✓ 0 open
 SECURITY FINDINGS: ✓ 0 open
-PHASE PROGRESS:    Phase 3 COMPLETE — Phase 4 next
+PHASE PROGRESS:    Phase 4 COMPLETE — Phase 5 next
 REPO:              ✓ Public on GitHub — OriginalLeeDunn/projekt.ReaperKey
-BRANCHES:          ✓ main (v0.3.1) + dev (synced)
+BRANCHES:          ✓ main (v0.4.1) + dev (synced)
 CI:                ✓ All green — rust + sdk + security + coverage
-TESTS PASSING:     ✓ 32 Rust + 38 SDK = 70 total
+TESTS PASSING:     ✓ 40 Rust + 38 SDK = 78 total
 TESTS IGNORED:     0
-COVERAGE:          87.18%+ Rust (gate: 80%) | 96.83% SDK lines / 80.48% branches
-README:            ✓ Live
-CHANGELOG:         ✓ v0.1.0 + v0.2.0 + v0.3.0 + v0.3.1 published
-DEPLOYMENTS LOG:   ✓ Deployments #1 through #4 recorded
-RELEASES:          ✓ v0.1.0 + v0.2.0 + v0.3.0 + v0.3.1 on GitHub
-OPEN ISSUES:       1 (#33 — error cause logging, Phase 4 scope)
+COVERAGE:          80%+ Rust (gate: 80%) | 96.83% SDK lines / 80.48% branches
+README:            ✓ Live — Docker quickstart added
+CHANGELOG:         ✓ v0.1.0–v0.4.1 published
+DEPLOYMENTS LOG:   ✓ Deployments #1 through #6 recorded
+RELEASES:          ✓ v0.1.0–v0.4.1 on GitHub
+OPEN ISSUES:       0
 ```
 
 ---

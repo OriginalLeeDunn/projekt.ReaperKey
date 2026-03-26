@@ -15,6 +15,48 @@ _Nothing unreleased yet._
 
 ---
 
+## [0.4.1] — 2026-03-26
+
+### Tests
+- Security headers — assert `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` on every response (closes #69)
+- Request ID — assert `X-Request-ID` header is present and a valid UUID (closes #70)
+- CORS — assert configured origin is allowed; unapproved origin is denied (closes #71)
+- Health 503 — assert `GET /health` returns `503` + `"status": "degraded"` when DB pool is closed (closes #72)
+- Internal error isolation — assert `AppError::Internal` returns `{ "error": "internal_error" }` without leaking cause (closes #73)
+- New `server/tests/health.rs` test file
+- **Total: 40 Rust tests + 38 SDK = 78 total (was 70)**
+
+---
+
+## [0.4.0] — 2026-03-26
+
+### Security
+- CORS hardening — replaced `CorsLayer::permissive()` with config-driven `cors_origins`; defaults to `["http://localhost:3000"]` (closes #61)
+- Security headers on every response — `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin` (closes #64)
+- `AppError::Internal(String)` — internal errors carry a descriptive cause string, logged server-side but never returned to clients (closes #33)
+
+### Observability
+- Request ID middleware — every request gets a `X-Request-ID` UUID header (closes #62)
+- Structured logging — `log_format = "json"` config field enables JSON tracing output for log aggregation (closes #62)
+
+### Reliability
+- `GET /health` returns `503 Service Unavailable` when DB check fails; `200 OK` when healthy (closes #65)
+
+### Deployment
+- `Dockerfile` — multi-stage build, non-root `ghostkey` user (UID 1001), SQLite volume at `/data` (closes #63)
+- `docker-compose.yml` — required env var validation, health check wired (closes #63)
+- `docs/deployment.md` — full production checklist, reverse proxy guide, env var reference (closes #63)
+- `README.md` — Docker quickstart section added
+
+### Config
+New optional fields in `[server]`:
+```toml
+cors_origins = ["http://localhost:3000"]
+log_format = "pretty"   # or "json"
+```
+
+---
+
 ## [0.3.1] — 2026-03-25
 
 ### Fixed
