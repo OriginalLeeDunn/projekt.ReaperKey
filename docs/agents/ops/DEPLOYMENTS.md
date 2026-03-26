@@ -1,7 +1,7 @@
 # ReaperKey — Deployment Registry
 
 **Maintained by:** Monitor Agent + DevOps Agent
-**Last Updated:** 2026-03-26 (post-deploy #6)
+**Last Updated:** 2026-03-26 (post-deploy #7)
 **Source:** https://github.com/OriginalLeeDunn/projekt.ReaperKey
 
 This is the authoritative record of all deployments to `main`.
@@ -20,26 +20,28 @@ Append-only — to record a rollback, add a new entry with type `ROLLBACK`.
 | 4 | 2026-03-25 | v0.3.1 | 4a5aac1 Pre-Phase 4: validation gap fixes #36–#43 | PATCH | ✓ all green | Health: ok | #33 |
 | 5 | 2026-03-26 | v0.4.0 | 1d7c6b7 Phase 4: CORS, security headers, request ID, structured logging, health 503, deployment docs | RELEASE | ✓ all green | Health: ok | #69–#73 |
 | 6 | 2026-03-26 | v0.4.1 | fffc660 Phase 4 validation gaps: security headers, request ID, CORS, health 503, internal error isolation tests | PATCH | ✓ all green | Health: ok | None |
+| 7 | 2026-03-26 | v0.5.0 | 39e4dd6 Phase 5: open source launch — docs, E2E tests, release workflow, SDK v1.0.0 | RELEASE | ✓ all green | Health: ok | #79–#88 |
 
 ---
 
 ## Current Production State
 
 ```
-Environment:   v0.4.1 — merged to main 2026-03-26
-Branch:        main (commit fffc660)
+Environment:   v0.5.0 — merged to main 2026-03-26
+Branch:        main (commit 39e4dd6)
 Last CI Run:   2026-03-26 — all green
                ✓ rust (fmt + clippy + test + audit)
                ✓ security (SPEC-200, SPEC-201, SPEC-202, SPEC-203 + Phase 4 hardening tests)
-               ✓ sdk (vitest 38 passing, coverage 96.83%, eslint clean)
+               ✓ sdk (vitest 39 passing, coverage 96.83%, eslint clean)
                ✓ coverage — 80%+ Rust (gate: 80%)
-Phase:         Phase 4 COMPLETE — Phase 5 READY
-Tests passing: 40 Rust (7 auth + 9 security + 4 account + 3 session_key + 2 recovery
-                       + 13 intent + 2 health)
-               + 38 SDK (15 client + 19 hook tests + 4 crypto tests)
+Phase:         Phase 5 COMPLETE
+Tests passing: 42 Rust (7 auth + 9 security + 4 account + 3 session_key + 2 recovery
+                       + 13 intent + 2 health + 2 e2e)
+               + 39 SDK (15 client + 20 hook tests + 4 crypto tests)
 Tests ignored: 0
 Coverage:      80%+ Rust | 96.83% SDK lines, 100% funcs, 80.48% branches
-Releases:      v0.1.0–v0.4.1 published on GitHub
+Releases:      v0.1.0–v0.5.0 published on GitHub
+SDK:           @ghostkey/sdk v1.0.0 (publishConfig added, release workflow ready)
 Open issues:   0
 ```
 

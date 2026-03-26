@@ -41,7 +41,7 @@ Before spawning any agent:
 - [x] Phase 2: TypeScript SDK, login flow, account fetch, send-intent (v0.2.0–v0.3.0)
 - [x] Phase 3: Reference app end-to-end, recovery flow (v0.3.0)
 - [x] Phase 4: Rate limiting, structured logging, error handling, test coverage (v0.4.1)
-- [ ] Phase 5: Docs published, README, security model, quickstart, roadmap
+- [x] Phase 5: Docs published, README, security model, quickstart, roadmap (v0.5.0)
   - [x] E2E-001 + E2E-002 tests (`server/tests/e2e.rs`)
   - [x] SPEC-100–103 SDK labels + localStorage non-write assertion
   - [x] `docs/quickstart.md`

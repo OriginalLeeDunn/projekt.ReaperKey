@@ -15,6 +15,43 @@ _Nothing unreleased yet._
 
 ---
 
+## [0.5.0] — 2026-03-26 — Phase 5: Open Source Launch
+
+### Tests
+- E2E-001: Full 5-step integration flow (login → account → session key → intent insert → poll pending → confirm) (`server/tests/e2e.rs`)
+- E2E-002: Session expiry and renewal (expire session → 401 → new session → intent with new session)
+- SPEC-100: `useLogin` localStorage non-write assertion — token never written to storage (`sdk/tests/hooks.test.ts`)
+- SPEC-100–103 labels added to all SDK hook test suites
+- **Total: 42 Rust tests + 39 SDK = 81 total (was 78)**
+
+### Documentation
+- `docs/quickstart.md` — 5-step developer integration guide with full code examples
+- `docs/security-model.md` — threat model, OWASP Top 10 coverage, non-custodial guarantees
+- `docs/api/endpoints.md` — complete API reference for all 9 endpoints
+- `docs/sdk/hooks.md` — SDK hook reference (useLogin, useAccount, useSessionKey, useSendIntent, useRecovery)
+- `docs/roadmap.md` — v1.0, v1.x, v2.0 plans
+
+### Release Automation
+- `.github/workflows/release.yml` — multi-platform binary builds (x86_64/aarch64 Linux + macOS) + npm publish triggered on tag push
+
+### SDK
+- `sdk/package.json` version `0.1.0` → `1.0.0` (independent versioning, see DECISIONS.md 2026-03-26)
+- Added `publishConfig` for npm public registry
+
+### README
+- Added npm version badge
+- Added SDK install section (`npm install @ghostkey/sdk`)
+- Added documentation table with links to all new docs
+- Fixed API auth column
+- Updated security section to link `docs/security-model.md`
+
+### Architecture Decisions (DECISIONS.md)
+- E2E test strategy: Rust axum_test over shell/Docker
+- SDK independent versioning: v1.0.0 decoupled from server v0.x
+- Deferred OpenAPI auto-generation to v1 (utoipa)
+
+---
+
 ## [0.4.1] — 2026-03-26
 
 ### Tests
