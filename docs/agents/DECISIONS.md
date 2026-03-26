@@ -114,3 +114,41 @@ Format: append-only. To reverse a decision, add a `Superseded by:` line.
 **Reviewed by:** Security Lead ✓ | Founder ✓
 **Status:** Accepted
 **Supersedes:** SPEC-003 old-token-invalidation requirement (issue #54)
+
+---
+
+## 2026-03-26 — Architect — Phase 5 E2E Test Implementation Strategy
+
+**Phase:** Phase 5 (Open Source Launch)
+**Context:** DEVOPS.md specifies `e2e: docker-compose up → e2e suite → docker-compose down` on merge to main. E2E-001 and E2E-002 have no implementation. Two options: shell/curl scripts (matches spec literally) or Rust integration tests using `axum_test` + wiremock.
+**Decision:** Implement E2E-001 and E2E-002 as Rust integration tests in `server/tests/e2e.rs` using `axum_test` + wiremock. Defer the Docker-based `e2e` CI job to a future ops hardening sprint.
+**Rationale:** Rust tests use the same proven infrastructure as the existing 40-test suite. No Docker daemon dependency in CI. Portable across all runners. Shell scripts are fragile, harder to assert precisely, and require managing process lifecycle. The Rust tests cover the full behavioral contract of E2E-001/E2E-002 without sacrificing reliability.
+**Risks:** Does not exercise the Docker packaging path. Accepted for v0 — the Dockerfile is tested manually. A Docker-based smoke test can be added in a future ops sprint.
+**Reviewed by:** DevOps Agent ✓ | QA Engineer ✓
+**Status:** Accepted
+
+---
+
+## 2026-03-26 — Founder — SDK Independent Versioning
+
+**Phase:** Phase 5 (Open Source Launch)
+**Context:** Server is at v0.4.1. SDK `package.json` is at `0.1.0`. Options: (a) align SDK version to server (v0.4.1), (b) bump independently to v1.0.0 to signal stable public API.
+**Decision:** SDK follows independent versioning. First npm publish will be `v1.0.0`.
+**Rationale:** Server and SDK evolve at different rates. Aligning would cause confusing jumps (0.1.0 → 0.4.1) with no intervening changes visible to npm consumers. `v1.0.0` signals that the hooks API is stable and intentionally designed. Server uses semver independently (currently v0.x, pre-stable).
+**Risks:** Server at v0.x while SDK is at v1.x could create mixed signals. Documented here to prevent confusion.
+**Future:** If the SDK undergoes breaking hook API changes, bump major (v2.0.0). Server version changes do not automatically require an SDK bump.
+**Reviewed by:** SDK Engineer ✓ | Docs Agent ✓
+**Status:** Accepted
+
+---
+
+## 2026-03-26 — Architect — Defer OpenAPI Auto-Generation to v1
+
+**Phase:** Phase 5 (Open Source Launch)
+**Context:** Docs Agent role specifies auto-generating OpenAPI spec from Rust handlers via `utoipa`. No utoipa annotations exist in the codebase. Annotating all handlers is significant work and adds a new dependency.
+**Decision:** Defer utoipa/OpenAPI auto-generation to v1. Phase 5 docs will use a manually maintained `docs/api/endpoints.md`.
+**Rationale:** Manual docs are faster to produce for launch. The API surface is small (8 endpoints). Adding utoipa annotations to all handlers mid-Phase 5 would delay launch with minimal user benefit. The API is stable enough that manual docs won't drift significantly before v1.
+**Risks:** Manual docs can drift from implementation. Mitigated by: API is frozen for v0, validation tests enforce contract.
+**Future:** Add utoipa in v1 when the API surface grows and manual maintenance becomes impractical.
+**Reviewed by:** Docs Agent ✓
+**Status:** Accepted

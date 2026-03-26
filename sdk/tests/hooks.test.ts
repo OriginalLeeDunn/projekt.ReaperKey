@@ -39,7 +39,13 @@ function wrapper(client: GhostKeyClient) {
 
 // ── useLogin ──────────────────────────────────────────────────────────────────
 
+// SPEC-100: useLogin — session token is held in memory only; never written to localStorage
 describe('useLogin', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.spyOn(Storage.prototype, 'setItem')
+  })
+
   it('starts idle and unauthenticated', () => {
     const client = mockClient()
     const { result } = renderHook(() => useLogin(), { wrapper: wrapper(client) })
@@ -63,6 +69,27 @@ describe('useLogin', () => {
     expect(result.current.status).toBe('authenticated')
     expect(result.current.userId).toBe('user-1')
     expect(client.setToken).toHaveBeenCalledWith('tok')
+  })
+
+  // SPEC-100: token must never be persisted to localStorage (non-custodial constraint)
+  it('SPEC-100: does not write token to localStorage', async () => {
+    const client = mockClient({
+      login: vi.fn().mockResolvedValue({
+        data: { userId: 'user-1', token: 'tok', expiresAt: '2099-01-01' },
+        error: null,
+      }),
+    })
+    const { result } = renderHook(() => useLogin(), { wrapper: wrapper(client) })
+
+    await act(async () => {
+      await result.current.login('email', 'test@example.com')
+    })
+
+    expect(localStorage.setItem).not.toHaveBeenCalledWith(
+      expect.any(String),
+      expect.stringContaining('tok'),
+    )
+    expect(localStorage.length).toBe(0)
   })
 
   it('sets error status on failed login', async () => {
@@ -102,6 +129,7 @@ describe('useLogin', () => {
 
 // ── useAccount ────────────────────────────────────────────────────────────────
 
+// SPEC-101: useAccount — create and fetch account state management
 describe('useAccount', () => {
   const mockAccount = {
     accountId: 'acc-1',
@@ -165,6 +193,7 @@ describe('useAccount', () => {
 
 // ── useSessionKey ─────────────────────────────────────────────────────────────
 
+// SPEC-102: useSessionKey — issue and clear session key state management
 describe('useSessionKey', () => {
   const mockSessionReq = {
     accountId: 'acc-1',
@@ -218,6 +247,7 @@ describe('useSessionKey', () => {
 
 // ── useSendIntent ─────────────────────────────────────────────────────────────
 
+// SPEC-103: useSendIntent — execute intent and poll for confirmation
 describe('useSendIntent', () => {
   const intent = { target: '0xabc', calldata: '0x', value: '0' }
 
