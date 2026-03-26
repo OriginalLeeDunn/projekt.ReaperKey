@@ -55,7 +55,9 @@ GIVEN:  a valid, non-expired token
 WHEN:   POST /auth/refresh { token: <valid_token> }
 THEN:   - HTTP 200
         - new token issued with fresh expiry
-        - old token is invalidated
+NOTE:   Old token remains valid until its exp claim expires (stateless JWT).
+        Token denylist is explicitly out of scope for v0. See DECISIONS.md
+        2026-03-26 "Stateless JWT — no token denylist for v0".
 OWNER:  server/tests/auth.rs
 ```
 
