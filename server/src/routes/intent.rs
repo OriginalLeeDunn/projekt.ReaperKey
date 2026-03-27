@@ -30,7 +30,7 @@ pub async fn execute(
 
     // Load and validate session
     let session: Option<crate::models::session::DbSession> = sqlx::query_as(
-        "SELECT id, account_id, key_hash, allowed_targets, allowed_selectors, max_value_wei, expires_at, created_at
+        "SELECT id, account_id, key_hash, session_key_address, allowed_targets, allowed_selectors, max_value_wei, expires_at, created_at
          FROM sessions WHERE id = ?",
     )
     .bind(body.session_id.to_string())
