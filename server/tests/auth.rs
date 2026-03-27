@@ -109,6 +109,57 @@ async fn expired_token_returns_401() {
     assert_eq!(res.json::<serde_json::Value>()["error"], "token_expired");
 }
 
+// Logout: POST /auth/logout → 204 No Content
+#[tokio::test]
+async fn logout_returns_204() {
+    let server = helpers::test_server().await;
+    let (token, _) = helpers::login(&server, "logout-204@example.com").await;
+
+    let res = server
+        .post("/auth/logout")
+        .add_header("Authorization", format!("Bearer {token}"))
+        .await;
+    res.assert_status(StatusCode::NO_CONTENT);
+}
+
+// Logout: token is denied on subsequent protected requests
+#[tokio::test]
+async fn logout_token_is_revoked() {
+    let server = helpers::test_server().await;
+    let (token, _) = helpers::login(&server, "logout-revoke@example.com").await;
+
+    // Create an account to verify the token works before logout
+    let pre_res = server
+        .post("/account/create")
+        .add_header("Authorization", format!("Bearer {token}"))
+        .json(&serde_json::json!({ "chain": "base", "address": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045" }))
+        .await;
+    pre_res.assert_status(StatusCode::CREATED);
+
+    // Logout
+    server
+        .post("/auth/logout")
+        .add_header("Authorization", format!("Bearer {token}"))
+        .await
+        .assert_status(StatusCode::NO_CONTENT);
+
+    // Same token must now be rejected
+    let post_res = server
+        .post("/account/create")
+        .add_header("Authorization", format!("Bearer {token}"))
+        .json(&serde_json::json!({ "chain": "base", "address": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045" }))
+        .await;
+    post_res.assert_status(StatusCode::UNAUTHORIZED);
+}
+
+// Logout: without a valid token → 401
+#[tokio::test]
+async fn logout_without_token_returns_401() {
+    let server = helpers::test_server().await;
+    let res = server.post("/auth/logout").await;
+    res.assert_status(StatusCode::UNAUTHORIZED);
+}
+
 // SPEC-006: rate limit — 11th login from same IP returns 429
 #[tokio::test]
 async fn login_rate_limit_returns_429() {

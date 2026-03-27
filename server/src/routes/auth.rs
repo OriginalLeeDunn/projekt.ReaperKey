@@ -9,6 +9,7 @@ use uuid::Uuid;
 use crate::{
     auth_jwt,
     error::{AppError, AppResult},
+    middleware::AuthUser,
     models::user::{AuthResponse, DbUser, LoginRequest, RefreshRequest},
     routes::AppState,
 };
@@ -122,6 +123,36 @@ pub async fn refresh(
         token,
         expires_at,
     }))
+}
+
+/// POST /auth/logout — revoke the current token immediately.
+/// Adds the token's SHA-256 hash to the denylist; subsequent requests
+/// using this token will receive 401 even before natural expiry.
+#[tracing::instrument(skip(state, headers), fields(user_id = %auth.user_id))]
+pub async fn logout(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    headers: HeaderMap,
+) -> AppResult<StatusCode> {
+    let token = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .ok_or(AppError::Unauthorized("missing token"))?;
+
+    let hash = auth_jwt::token_hash(token);
+
+    // Fetch expiry from the claims so the denylist entry can be pruned later
+    let claims = auth_jwt::validate(token, &state.config.auth.jwt_secret)?;
+
+    sqlx::query("INSERT OR IGNORE INTO token_denylist (token_hash, expires_at) VALUES (?, ?)")
+        .bind(&hash)
+        .bind(claims.exp)
+        .execute(&state.db)
+        .await?;
+
+    tracing::info!(user_id = %auth.user_id, "auth.logout");
+    Ok(StatusCode::NO_CONTENT)
 }
 
 fn hash_credential(credential: &str) -> String {

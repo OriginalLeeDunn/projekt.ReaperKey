@@ -71,6 +71,7 @@ pub fn build(db: Db, config: Config) -> Router {
         .route("/health", get(health::check))
         .route("/auth/login", post(auth::login))
         .route("/auth/refresh", post(auth::refresh))
+        .route("/auth/logout", post(auth::logout))
         .route("/account/create", post(account::create))
         .route("/account/:id", get(account::fetch))
         .route("/session-key/issue", post(session_key::issue))
