@@ -25,8 +25,8 @@ If an attacker fully compromises the GhostKey server, they cannot move user fund
 - Method: HMAC-SHA256 JWT signed with `JWT_SECRET`
 - TTL: 1 hour (`exp` claim)
 - Storage: in-memory only on the client (never localStorage, never cookies)
-- Stateless: no token denylist for v0 (see [DECISIONS.md](./agents/DECISIONS.md) 2026-03-26)
-- Blast radius of a stolen JWT: up to 1 hour of API access, but no key access
+- Logout invalidation: `POST /auth/logout` adds the token's SHA-256 hash to the `token_denylist` database table; all subsequent requests bearing that token are rejected with `401 unauthorized`
+- Blast radius of a stolen JWT: up to 1 hour of API access (reduced to zero on explicit logout), but no key access
 
 ### Rate limiting
 
@@ -87,7 +87,7 @@ The 202-then-poll pattern prevents HTTP timeouts on slow bundler responses. Inte
 | A04 Insecure Design | Non-custodial by design; session key scoping; 202+poll prevents sync exploits |
 | A05 Security Misconfiguration | Config-driven CORS (no wildcard in prod); security headers on all responses |
 | A06 Vulnerable Components | `cargo audit` in CI; RUSTSEC-2023-0071 suppressed with justification |
-| A07 Auth Failures | Rate limiting; short JWT TTL; session key expiry |
+| A07 Auth Failures | Rate limiting; short JWT TTL; JWT denylist on logout; session key expiry |
 | A08 Software Integrity | CI gates; cargo lockfile; npm lockfile |
 | A09 Logging Failures | Structured tracing logs; key material never logged; request IDs on all requests |
 | A10 SSRF | No user-controlled URLs in server code; bundler/paymaster URLs are env-var config only |
@@ -117,7 +117,7 @@ Allowed origins are configured via `cors_origins` in `config.toml` (or env var `
 
 ### In scope (GhostKey defends against)
 
-- Unauthorized API access (JWT auth + rate limiting)
+- Unauthorized API access (JWT auth + rate limiting + logout denylist)
 - Session key misuse (scope enforcement on every intent)
 - SQL injection (parameterized queries)
 - Key material exfiltration via API (server never holds keys)

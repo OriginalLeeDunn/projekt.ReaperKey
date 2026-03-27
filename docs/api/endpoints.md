@@ -69,6 +69,29 @@ Refresh a JWT before it expires.
 
 ---
 
+### POST /auth/logout
+
+Invalidate the current JWT. The token's SHA-256 hash is recorded in the `token_denylist` table; any subsequent request bearing the same token is rejected with `401 unauthorized`.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response — 200 OK**
+
+```json
+{
+  "message": "logged out"
+}
+```
+
+**Errors**
+
+| Status | `error` | Description |
+|--------|---------|-------------|
+| 401 | `unauthorized` | Missing or invalid JWT |
+| 429 | `rate_limited` | Rate limit exceeded |
+
+---
+
 ## Accounts
 
 ### POST /account/create
@@ -90,7 +113,7 @@ The address is computed client-side (counterfactual). The server validates forma
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `chain` | string | yes | Chain identifier. Currently: `"base"` |
+| `chain` | string | yes | Chain identifier. Supported values: `"base"` (default), `"arbitrum"`, `"ethereum"` |
 | `address` | string | yes | EIP-55 checksummed address |
 
 **Response — 201 Created**
@@ -352,7 +375,7 @@ Server health check. No authentication required.
   "status": "ok",
   "db": "ok",
   "chains": ["base"],
-  "version": "0.4.1"
+  "version": "1.0.0"
 }
 ```
 
@@ -363,7 +386,7 @@ Server health check. No authentication required.
   "status": "degraded",
   "db": "error",
   "chains": ["base"],
-  "version": "0.4.1"
+  "version": "1.0.0"
 }
 ```
 

@@ -14,7 +14,7 @@ import { GhostKeyProvider } from '@ghostkey/sdk'
 <GhostKeyProvider
   config={{
     apiUrl: 'https://your-server.example.com', // required
-    chainId: 84532,                             // required; 8453 = Base Mainnet, 84532 = Base Sepolia
+    chainId: 84532,                             // required; 8453 = Base Mainnet, 84532 = Base Sepolia, 42161 = Arbitrum One, 1 = Ethereum Mainnet
   }}
 >
   {children}
@@ -48,7 +48,7 @@ await login('email', 'user@example.com')
 
 ### `logout()`
 
-Clears the token from memory. Sets `status = 'idle'`.
+Calls `POST /auth/logout` to invalidate the JWT server-side (the token SHA-256 hash is added to the `token_denylist` table), then clears the token from memory. Sets `status = 'idle'`.
 
 ```tsx
 logout()
@@ -181,14 +181,15 @@ Clears session key from state. Useful on logout or after session expiry.
 
 ```tsx
 const {
-  sendIntent,  // (sessionId: string, intent: IntentRequest) => Promise<IntentStatus>
-  reset,       // () => void
-  intentId,    // string | null
-  status,      // 'pending' | 'confirmed' | 'failed' | null
-  txHash,      // string | null
-  blockNumber, // number | null
-  loading,     // boolean
-  error,       // { code: string; message: string } | null
+  sendIntent,                 // (sessionId: string, intent: IntentRequest) => Promise<IntentStatus>
+  sendIntentWithSessionKey,   // (sessionId: string, intent: IntentWithSessionKey) => Promise<IntentStatus>
+  reset,                      // () => void
+  intentId,                   // string | null
+  status,                     // 'pending' | 'confirmed' | 'failed' | null
+  txHash,                     // string | null
+  blockNumber,                // number | null
+  loading,                    // boolean
+  error,                      // { code: string; message: string } | null
 } = useSendIntent()
 ```
 
@@ -204,7 +205,7 @@ interface IntentRequest {
 
 ### `sendIntent(sessionId, intent)`
 
-Calls `POST /intent/execute`, then polls `GET /intent/:id/status` until the intent reaches `confirmed` or `failed`. Returns the final `IntentStatus`.
+Calls `POST /intent/execute` with a caller-supplied `user_operation` object, then polls `GET /intent/:id/status` until the intent reaches `confirmed` or `failed`. Returns the final `IntentStatus`. Use this when you need full manual control over the UserOperation fields.
 
 ```tsx
 const result = await sendIntent(sessionKey.sessionId, {
@@ -217,6 +218,34 @@ if (result.status === 'confirmed') {
   console.log('tx:', result.txHash)
 }
 ```
+
+### `sendIntentWithSessionKey(sessionId, intent)` (v1.0.0+)
+
+**GAP-001** — Higher-level alternative to `sendIntent`. The SDK builds the UserOperation automatically from the session key and intent fields; you do not need to construct or pass `user_operation` manually. Internally calls `POST /intent/execute` with the assembled UserOperation, then polls for confirmation.
+
+```tsx
+const result = await sendIntentWithSessionKey(sessionKey.sessionId, {
+  target: '0xTokenContract',
+  calldata: encodedTransferCalldata,
+  value: '0',
+})
+
+if (result.status === 'confirmed') {
+  console.log('tx:', result.txHash)
+}
+```
+
+### IntentWithSessionKey type
+
+```ts
+interface IntentWithSessionKey {
+  target: string    // Contract address to call
+  calldata: string  // ABI-encoded calldata (hex with 0x prefix)
+  value: string     // ETH value in wei (decimal string), usually '0'
+}
+```
+
+`IntentWithSessionKey` has the same shape as `IntentRequest`. The distinction is in how the hook uses it: `sendIntentWithSessionKey` auto-builds the UserOperation (GAP-001), whereas `sendIntent` passes the fields through with an empty `user_operation: {}`.
 
 ### IntentStatus type
 
