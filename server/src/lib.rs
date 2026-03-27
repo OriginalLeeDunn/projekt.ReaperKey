@@ -1,3 +1,4 @@
+pub mod activity;
 pub mod auth_jwt;
 pub mod chain;
 pub mod config;

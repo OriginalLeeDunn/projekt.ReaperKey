@@ -9,6 +9,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = join(__dirname, '..')
 const DB_PATH = join(REPO_ROOT, 'db/ghostkey.db')
 const ACTIVITY_LOG = join(REPO_ROOT, 'docs/agents/ACTIVITY.log')
+const INBOX_PATH = join(REPO_ROOT, 'docs/agents/INBOX.md')
+const OUTBOX_PATH = join(REPO_ROOT, 'docs/agents/OUTBOX.md')
+const DECISIONS_PATH = join(REPO_ROOT, 'docs/agents/DECISIONS.md')
+const HEALTH_PATH = join(REPO_ROOT, 'docs/agents/HEALTH.md')
 
 const app = express()
 app.use(express.json())
@@ -65,6 +69,15 @@ ${body}
   } else {
     appendFileSync(inboxPath, memoBlock)
   }
+  // Emit activity entry so the live feed reflects memo arrival
+  appendActivity({
+    event_type: 'agent',
+    agent: 'Inbox Agent',
+    action: 'memo_received',
+    detail: `${memoId} → ${to}: ${subject}`,
+    status: 'ok',
+    meta: { memo_id: memoId, to, from: from || 'Founder', priority: priority || 'MEDIUM' },
+  })
   res.json({ ok: true, memoId })
 })
 
@@ -109,12 +122,29 @@ app.get('/api/activity', (req, res) => {
   } catch { res.json([]) }
 })
 
-app.post('/api/activity', (req, res) => {
-  const { agent, action, detail, status } = req.body
-  if (!agent || !action) return res.status(400).json({ error: 'agent and action required' })
-  const entry = { ts: new Date().toISOString(), agent, action, detail: detail || '', status: status || 'ok' }
+// ── Activity helpers ──────────────────────────────────────────────────────────
+
+function appendActivity(fields) {
+  const entry = {
+    ts: new Date().toISOString(),
+    event_type: fields.event_type || 'agent',
+    agent: fields.agent,
+    action: fields.action,
+    detail: fields.detail || '',
+    status: fields.status || 'ok',
+    ...(fields.user_id && { user_id: fields.user_id }),
+    ...(fields.chain && { chain: fields.chain }),
+    ...(fields.meta && { meta: fields.meta }),
+  }
   appendFileSync(ACTIVITY_LOG, JSON.stringify(entry) + '\n')
-  res.json({ ok: true })
+  return entry
+}
+
+app.post('/api/activity', (req, res) => {
+  const { agent, action } = req.body
+  if (!agent || !action) return res.status(400).json({ error: 'agent and action required' })
+  const entry = appendActivity(req.body)
+  res.json({ ok: true, entry })
 })
 
 // ── Database Viewer ───────────────────────────────────────────────────────────
@@ -220,7 +250,17 @@ app.get('/api/stream/activity', (req, res) => {
   req.on('close', () => { sseClients.delete(res); clearInterval(heartbeat) })
 })
 
-// Watch ACTIVITY.log for new appended lines and broadcast to all SSE clients
+// ── SSE broadcast helpers ─────────────────────────────────────────────────────
+
+function broadcast(entry) {
+  const payload = `data: ${JSON.stringify(entry)}\n\n`
+  for (const client of sseClients) {
+    try { client.write(payload) } catch { sseClients.delete(client) }
+  }
+}
+
+// Watch ACTIVITY.log for new appended lines and broadcast to all SSE clients.
+// Backend (Rust) and Claude tool hooks write here directly; this picks them up.
 let lastLogSize = 0
 if (existsSync(ACTIVITY_LOG)) {
   lastLogSize = readFileSync(ACTIVITY_LOG).length
@@ -234,22 +274,96 @@ function broadcastNewEntries() {
   lastLogSize = content.length
   const newLines = newContent.trim().split('\n').filter(Boolean)
   for (const line of newLines) {
-    try {
-      const entry = JSON.parse(line)
-      const payload = `data: ${JSON.stringify(entry)}\n\n`
-      for (const client of sseClients) {
-        try { client.write(payload) } catch { sseClients.delete(client) }
-      }
-    } catch { /* skip malformed lines */ }
+    try { broadcast(JSON.parse(line)) } catch { /* skip malformed lines */ }
   }
 }
 
-// Watch the docs/agents directory so we catch the file being created too
+// ── Doc file watchers — synthesise activity entries from agent doc changes ────
+// Track last sizes to detect appends (avoids re-processing on unchanged files)
+const docSizes = { inbox: 0, outbox: 0, decisions: 0, health: 0 }
+if (existsSync(INBOX_PATH)) docSizes.inbox = readFileSync(INBOX_PATH).length
+if (existsSync(OUTBOX_PATH)) docSizes.outbox = readFileSync(OUTBOX_PATH).length
+if (existsSync(DECISIONS_PATH)) docSizes.decisions = readFileSync(DECISIONS_PATH).length
+if (existsSync(HEALTH_PATH)) docSizes.health = readFileSync(HEALTH_PATH).length
+
+function handleDocChange(filePath, sizeKey, buildEntry) {
+  if (!existsSync(filePath)) return
+  const content = readFileSync(filePath, 'utf-8')
+  if (content.length <= docSizes[sizeKey]) return
+  const delta = content.slice(docSizes[sizeKey])
+  docSizes[sizeKey] = content.length
+  const entry = buildEntry(delta.trim())
+  if (!entry) return
+  appendFileSync(ACTIVITY_LOG, JSON.stringify(entry) + '\n')
+  broadcast(entry)
+}
+
+function makeEntry(fields) {
+  return {
+    ts: new Date().toISOString(),
+    event_type: fields.event_type || 'agent',
+    agent: fields.agent,
+    action: fields.action,
+    detail: fields.detail || '',
+    status: fields.status || 'ok',
+    ...(fields.meta && { meta: fields.meta }),
+  }
+}
+
+// INBOX.md — a new MEMO block was appended by someone other than the /api/memo endpoint
+function onInboxChange(delta) {
+  const memoMatch = delta.match(/###\s+(MEMO-\d+)[^\n]*\n[^*]*\*\*To:\*\*\s*([^\n]+)/i)
+  if (!memoMatch) return null
+  const [, memoId, to] = memoMatch
+  const subjectMatch = delta.match(/\*\*Subject:\*\*\s*([^\n]+)/)
+  const subject = subjectMatch ? subjectMatch[1].trim() : 'unknown'
+  return makeEntry({
+    event_type: 'agent', agent: 'Inbox Agent', action: 'memo_received',
+    detail: `${memoId} → ${to.trim()}: ${subject}`,
+    status: 'ok', meta: { memo_id: memoId, to: to.trim() },
+  })
+}
+
+// OUTBOX.md — an agent wrote a response
+function onOutboxChange(delta) {
+  const headingMatch = delta.match(/##\s+(.+)/)
+  const detail = headingMatch ? headingMatch[1].trim() : delta.split('\n')[0].slice(0, 80)
+  return makeEntry({ event_type: 'agent', agent: 'Orchestrator', action: 'memo_response', detail, status: 'ok' })
+}
+
+// DECISIONS.md — an architectural decision was logged
+function onDecisionsChange(delta) {
+  const headingMatch = delta.match(/##\s+(.+)/)
+  const detail = headingMatch ? headingMatch[1].trim() : delta.split('\n')[0].slice(0, 80)
+  return makeEntry({ event_type: 'agent', agent: 'Architect', action: 'decision_logged', detail, status: 'ok' })
+}
+
+// HEALTH.md — Governor ran a health assessment
+function onHealthChange(delta) {
+  const overallMatch = delta.match(/OVERALL:\s*([^\n]+)/)
+  const detail = overallMatch ? `Health assessed: ${overallMatch[1].trim()}` : 'HEALTH.md updated'
+  const hasError = delta.toLowerCase().includes('critical') || delta.toLowerCase().includes('error')
+  const hasWarn = delta.toLowerCase().includes('gap') || delta.toLowerCase().includes('warning')
+  return makeEntry({
+    event_type: 'agent', agent: 'Governor', action: 'health_assessment',
+    detail, status: hasError ? 'error' : hasWarn ? 'warn' : 'ok',
+  })
+}
+
+// Single watcher on docs/agents/ directory catches top-level file changes.
+// Node's fs.watch is non-recursive so subdir changes are caught separately.
 watch(join(REPO_ROOT, 'docs/agents'), { persistent: false }, (event, filename) => {
-  if (filename === 'ACTIVITY.log') broadcastNewEntries()
+  if (filename === 'ACTIVITY.log') return broadcastNewEntries()
+  if (filename === 'INBOX.md') return handleDocChange(INBOX_PATH, 'inbox', onInboxChange)
+  if (filename === 'OUTBOX.md') return handleDocChange(OUTBOX_PATH, 'outbox', onOutboxChange)
+  if (filename === 'DECISIONS.md') return handleDocChange(DECISIONS_PATH, 'decisions', onDecisionsChange)
+  if (filename === 'HEALTH.md') return handleDocChange(HEALTH_PATH, 'health', onHealthChange)
 })
 
-// ── Agent write helper — called by Claude hooks ───────────────────────────────
-// POST /api/activity already handles this; the SSE watcher picks up the write.
+// Watch docs/agents/ACTIVITY.log directly to also catch Rust backend writes
+// (which go directly to the file, bypassing the directory watcher sometimes)
+if (existsSync(ACTIVITY_LOG)) {
+  watch(ACTIVITY_LOG, { persistent: false }, () => broadcastNewEntries())
+}
 
 app.listen(3003, () => console.log('Dashboard API server running on :3003'))

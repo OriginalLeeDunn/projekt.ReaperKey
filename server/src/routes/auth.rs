@@ -7,6 +7,7 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::{
+    activity::ActivityEntry,
     auth_jwt,
     error::{AppError, AppResult},
     middleware::AuthUser,
@@ -37,6 +38,10 @@ pub async fn login(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("unknown");
     if !state.rate_limiter.check(&format!("login:{ip}")) {
+        state.activity.emit(
+            ActivityEntry::backend("auth.ratelimit.hit", "rate limit exceeded on login", "warn")
+                .with_meta(serde_json::json!({ "endpoint": "POST /auth/login" })),
+        );
         return Err(AppError::RateLimited);
     }
 
@@ -76,6 +81,16 @@ pub async fn login(
     )?;
 
     tracing::info!(user_id = %user_id, is_new, "auth.login.success");
+    let detail = if is_new {
+        "new user registered"
+    } else {
+        "user authenticated"
+    };
+    state.activity.emit(
+        ActivityEntry::backend("auth.login.success", detail, "ok")
+            .with_user(user_id)
+            .with_meta(serde_json::json!({ "is_new": is_new })),
+    );
     let status = if is_new {
         StatusCode::CREATED
     } else {
@@ -118,6 +133,9 @@ pub async fn refresh(
     )?;
 
     tracing::info!(user_id = %user_id, "auth.refresh.success");
+    state.activity.emit(
+        ActivityEntry::backend("auth.refresh.success", "token refreshed", "ok").with_user(user_id),
+    );
     Ok(Json(AuthResponse {
         user_id,
         token,
@@ -152,6 +170,9 @@ pub async fn logout(
         .await?;
 
     tracing::info!(user_id = %auth.user_id, "auth.logout");
+    state
+        .activity
+        .emit(ActivityEntry::backend("auth.logout", "token revoked", "ok").with_user(auth.user_id));
     Ok(StatusCode::NO_CONTENT)
 }
 
