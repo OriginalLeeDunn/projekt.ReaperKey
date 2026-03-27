@@ -40,12 +40,13 @@ pub async fn issue(
         .map_err(|_| AppError::BadRequest("invalid allowed_selectors".into()))?;
 
     sqlx::query(
-        "INSERT INTO sessions (id, account_id, key_hash, allowed_targets, allowed_selectors, max_value_wei, expires_at, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO sessions (id, account_id, key_hash, session_key_address, allowed_targets, allowed_selectors, max_value_wei, expires_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(session_id.to_string())
     .bind(body.account_id.to_string())
     .bind(&body.key_hash)
+    .bind(&body.session_key_address)
     .bind(&allowed_targets)
     .bind(&allowed_selectors)
     .bind(&body.max_value_wei)
@@ -67,6 +68,7 @@ pub async fn issue(
         Json(SessionKeyResponse {
             session_id,
             key_hash: body.key_hash,
+            session_key_address: body.session_key_address,
             expires_at: expires_at_dt,
         }),
     ))
