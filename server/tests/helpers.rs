@@ -51,6 +51,8 @@ pub async fn test_server_and_db_with_bundler(
                 paymaster_url: paymaster_url.to_string(),
                 entry_point: "0x0000000071727De22E5E9d8BAf0edAc6f37da032".to_string(),
             },
+            arbitrum: None,
+            ethereum: None,
         },
     };
 

@@ -90,10 +90,19 @@ pub async fn execute(
         return Err(AppError::Forbidden);
     }
 
+    // Look up the account's chain so we can dispatch to the right adapter
+    let chain_name_row: Option<(String,)> =
+        sqlx::query_as("SELECT chain FROM accounts WHERE id = ?")
+            .bind(&session.account_id)
+            .fetch_optional(&state.db)
+            .await?;
+    let chain = chain_name_row
+        .map(|(c,)| c)
+        .unwrap_or_else(|| "base".to_string());
+
     // Persist intent as pending
     let intent_id = Uuid::new_v4();
     let now = Utc::now().timestamp();
-    let chain = "base"; // v0: Base only
 
     sqlx::query(
         "INSERT INTO intents (id, session_id, chain, target, calldata, value_wei, status, created_at, updated_at)
@@ -101,7 +110,7 @@ pub async fn execute(
     )
     .bind(intent_id.to_string())
     .bind(body.session_id.to_string())
-    .bind(chain)
+    .bind(&chain)
     .bind(&body.target)
     .bind(&body.calldata)
     .bind(&body.value)
@@ -110,11 +119,11 @@ pub async fn execute(
     .execute(&state.db)
     .await?;
 
-    tracing::info!(intent_id = %intent_id, target = %body.target, chain = chain, "intent.submitted");
+    tracing::info!(intent_id = %intent_id, target = %body.target, chain = %chain, "intent.submitted");
 
     // Spawn background task to submit UserOp to Pimlico bundler
     let db = state.db.clone();
-    let chain_adapter = state.chain.clone();
+    let chain_adapter = state.chain_for(&chain);
     let user_op = body.user_operation.clone();
     let id_str = intent_id.to_string();
     tokio::spawn(async move {
