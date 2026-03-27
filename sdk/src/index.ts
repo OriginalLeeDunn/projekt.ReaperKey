@@ -6,6 +6,13 @@ export { useSendIntent } from './hooks/useSendIntent.js'
 export { useSessionKey } from './hooks/useSessionKey.js'
 export { useRecovery } from './hooks/useRecovery.js'
 export { generateSessionKey } from './crypto.js'
+export {
+  getKernelAddressFromOwner,
+  getKernelAddressFromPrivateKey,
+  KERNEL_V2_4,
+  KERNEL_V3_1,
+} from './kernel-address.js'
+export type { GetKernelAddressParams, GetKernelAddressFromKeyParams } from './kernel-address.js'
 export type { SessionKey } from './crypto.js'
 export { GhostKeyClient } from './client.js'
 export type { ApiResult } from './client.js'
