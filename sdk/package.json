@@ -53,5 +53,8 @@
   "dependencies": {
     "permissionless": "^0.3.4",
     "viem": "^2.47.6"
+  },
+  "overrides": {
+    "ox": "0.14.7"
   }
 }
