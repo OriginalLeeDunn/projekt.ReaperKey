@@ -26,7 +26,7 @@ async fn main() -> Result<()> {
     tracing::info!(host = %config.server.host, port = %config.server.port, "starting ghostkey-server");
 
     let pool = db::connect(&config.database.url).await?;
-    db::migrate(&pool).await?;
+    db::migrate(&pool, &config.database.url).await?;
 
     let app = routes::build(pool, config.clone());
 

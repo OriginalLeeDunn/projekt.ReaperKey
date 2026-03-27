@@ -84,4 +84,54 @@ app.get('/api/github/runs', async (req, res) => {
   }
 })
 
+// Read OUTBOX.md (agent responses)
+app.get('/api/outbox', (req, res) => {
+  try {
+    const content = readFileSync(join(REPO_ROOT, 'docs/agents/OUTBOX.md'), 'utf-8')
+    res.json({ content })
+  } catch {
+    res.json({ content: '# OUTBOX\n\nNo responses yet.' })
+  }
+})
+
+// Read INBOX.md
+app.get('/api/inbox', (req, res) => {
+  try {
+    const content = readFileSync(join(REPO_ROOT, 'docs/agents/INBOX.md'), 'utf-8')
+    res.json({ content })
+  } catch {
+    res.json({ content: '# INBOX\n\nNo memos yet.' })
+  }
+})
+
+// Read DECISIONS.md
+app.get('/api/decisions', (req, res) => {
+  try {
+    const content = readFileSync(join(REPO_ROOT, 'docs/agents/DECISIONS.md'), 'utf-8')
+    res.json({ content })
+  } catch {
+    res.json({ content: '' })
+  }
+})
+
+// Read ORCHESTRATOR.md (for phase status)
+app.get('/api/phases', (req, res) => {
+  try {
+    const content = readFileSync(join(REPO_ROOT, 'docs/agents/corp/ORCHESTRATOR.md'), 'utf-8')
+    res.json({ content })
+  } catch {
+    res.json({ content: '' })
+  }
+})
+
+// Read DEPLOYMENTS.md
+app.get('/api/deployments', (req, res) => {
+  try {
+    const content = readFileSync(join(REPO_ROOT, 'docs/agents/DEPLOYMENTS.md'), 'utf-8')
+    res.json({ content })
+  } catch {
+    res.json({ content: '# DEPLOYMENTS\n\nNo deployments recorded yet.' })
+  }
+})
+
 app.listen(3003, () => console.log('Dashboard API server running on :3003'))

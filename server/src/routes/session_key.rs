@@ -10,6 +10,19 @@ use crate::{
 };
 
 /// POST /session-key/issue — SPEC-020, SPEC-021, SPEC-022, SPEC-023
+#[utoipa::path(
+    post,
+    path = "/session-key/issue",
+    tag = "session",
+    security(("bearer_token" = [])),
+    request_body = crate::models::session::IssueSessionKeyRequest,
+    responses(
+        (status = 201, description = "Session key issued", body = crate::models::session::SessionKeyResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Account not found"),
+    )
+)]
 #[tracing::instrument(skip(state, body), fields(user_id = %auth.user_id, account_id = %body.account_id))]
 pub async fn issue(
     State(state): State<AppState>,
@@ -40,12 +53,13 @@ pub async fn issue(
         .map_err(|_| AppError::BadRequest("invalid allowed_selectors".into()))?;
 
     sqlx::query(
-        "INSERT INTO sessions (id, account_id, key_hash, allowed_targets, allowed_selectors, max_value_wei, expires_at, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO sessions (id, account_id, key_hash, session_key_address, allowed_targets, allowed_selectors, max_value_wei, expires_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(session_id.to_string())
     .bind(body.account_id.to_string())
     .bind(&body.key_hash)
+    .bind(&body.session_key_address)
     .bind(&allowed_targets)
     .bind(&allowed_selectors)
     .bind(&body.max_value_wei)
@@ -67,6 +81,7 @@ pub async fn issue(
         Json(SessionKeyResponse {
             session_id,
             key_hash: body.key_hash,
+            session_key_address: body.session_key_address,
             expires_at: expires_at_dt,
         }),
     ))

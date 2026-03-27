@@ -30,6 +30,19 @@ impl FromRequestParts<AppState> for AuthUser {
 
         let claims = auth_jwt::validate(token, &state.config.auth.jwt_secret)?;
 
+        // Token denylist check — reject tokens explicitly revoked via POST /auth/logout
+        let hash = auth_jwt::token_hash(token);
+        let denied: Option<(String,)> =
+            sqlx::query_as("SELECT token_hash FROM token_denylist WHERE token_hash = ?")
+                .bind(&hash)
+                .fetch_optional(&state.db)
+                .await
+                .map_err(|_| AppError::Unauthorized("denylist check failed"))?;
+
+        if denied.is_some() {
+            return Err(AppError::Unauthorized("token_revoked"));
+        }
+
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|_| AppError::Unauthorized("invalid token subject"))?;
 

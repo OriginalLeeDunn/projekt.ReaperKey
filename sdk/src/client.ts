@@ -19,7 +19,7 @@ export type ApiResult<T> = { data: T; error: null } | { data: null; error: Ghost
 type RawAuth = { user_id: string; token: string; expires_at: string }
 type RawAccount = { account_id: string; address: string; chain: string; aa_type: string; created_at: string }
 type RawIntent = { intent_id: string; status: string; tx_hash: string | null; block_number: number | null }
-type RawSession = { session_id: string; key_hash: string; expires_at: string }
+type RawSession = { session_id: string; key_hash: string; session_key_address: string | null; expires_at: string }
 type RawRecovery = { recovery_id: string; method: string; status: string; instructions: string }
 
 export class GhostKeyClient {
@@ -118,7 +118,12 @@ export class GhostKeyClient {
   }
 
   private mapSession(raw: RawSession): SessionKeyResponse {
-    return { sessionId: raw.session_id, keyHash: raw.key_hash, expiresAt: raw.expires_at }
+    return {
+      sessionId: raw.session_id,
+      keyHash: raw.key_hash,
+      sessionKeyAddress: raw.session_key_address ?? null,
+      expiresAt: raw.expires_at,
+    }
   }
 
   private mapRecovery(raw: RawRecovery): RecoveryResult {

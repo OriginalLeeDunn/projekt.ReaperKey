@@ -1,5 +1,6 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
+use crate::{chain::ChainAdapter, config::Config, db::Db, middleware::RateLimiter};
 use axum::{
     http::{header, HeaderName, HeaderValue, Method},
     routing::{get, post},
@@ -12,8 +13,7 @@ use tower_http::{
     set_header::SetResponseHeaderLayer,
     trace::TraceLayer,
 };
-
-use crate::{chain::ChainAdapter, config::Config, db::Db, middleware::RateLimiter};
+use utoipa::OpenApi;
 
 pub mod account;
 pub mod auth;
@@ -27,12 +27,32 @@ pub struct AppState {
     pub db: Db,
     pub config: Config,
     pub rate_limiter: Arc<RateLimiter>,
-    pub chain: Arc<ChainAdapter>,
+    /// Multi-chain map: chain name (e.g. "base", "arbitrum") → adapter.
+    /// The "base" entry is always present; others are optional.
+    pub chains: Arc<HashMap<String, Arc<ChainAdapter>>>,
+}
+
+impl AppState {
+    /// Returns the chain adapter for a given chain name.
+    /// Falls back to "base" if the requested chain is not configured.
+    pub fn chain_for(&self, name: &str) -> Arc<ChainAdapter> {
+        self.chains
+            .get(name)
+            .or_else(|| self.chains.get("base"))
+            .cloned()
+            .expect("base chain always configured")
+    }
 }
 
 pub fn build(db: Db, config: Config) -> Router {
     let rate_limiter = Arc::new(RateLimiter::new(10, 60)); // 10 req / 60s per key
-    let chain = Arc::new(ChainAdapter::new(&config.chains.base));
+
+    // Build multi-chain adapter map
+    let mut chain_map: HashMap<String, Arc<ChainAdapter>> = HashMap::new();
+    for (name, cfg) in config.chains.all() {
+        chain_map.insert(name.to_string(), Arc::new(ChainAdapter::new(cfg)));
+    }
+    let chains = Arc::new(chain_map);
 
     // Build CORS from configured origins — #61
     let cors = build_cors(&config.server.cors_origins);
@@ -41,15 +61,17 @@ pub fn build(db: Db, config: Config) -> Router {
         db,
         config,
         rate_limiter,
-        chain,
+        chains,
     };
 
     let request_id_header = HeaderName::from_static("x-request-id");
 
     Router::new()
+        .route("/api/openapi.json", get(openapi_json))
         .route("/health", get(health::check))
         .route("/auth/login", post(auth::login))
         .route("/auth/refresh", post(auth::refresh))
+        .route("/auth/logout", post(auth::logout))
         .route("/account/create", post(account::create))
         .route("/account/:id", get(account::fetch))
         .route("/session-key/issue", post(session_key::issue))
@@ -76,6 +98,10 @@ pub fn build(db: Db, config: Config) -> Router {
         .layer(PropagateRequestIdLayer::new(request_id_header.clone()))
         .layer(SetRequestIdLayer::new(request_id_header, MakeRequestUuid))
         .with_state(state)
+}
+
+pub async fn openapi_json() -> axum::Json<utoipa::openapi::OpenApi> {
+    axum::Json(crate::openapi::ApiDoc::openapi())
 }
 
 fn build_cors(origins: &[String]) -> CorsLayer {

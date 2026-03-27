@@ -14,6 +14,18 @@ use crate::{
 };
 
 /// POST /account/create — SPEC-010, SPEC-013
+#[utoipa::path(
+    post,
+    path = "/account/create",
+    tag = "account",
+    security(("bearer_token" = [])),
+    request_body = crate::models::account::CreateAccountRequest,
+    responses(
+        (status = 201, description = "Account created", body = crate::models::account::AccountResponse),
+        (status = 200, description = "Account already exists (idempotent)", body = crate::models::account::AccountResponse),
+        (status = 401, description = "Unauthorized"),
+    )
+)]
 #[tracing::instrument(skip(state, body), fields(user_id = %auth.user_id, chain = %body.chain))]
 pub async fn create(
     State(state): State<AppState>,
@@ -69,6 +81,21 @@ pub async fn create(
 }
 
 /// GET /account/:id — SPEC-011, SPEC-012
+#[utoipa::path(
+    get,
+    path = "/account/{id}",
+    tag = "account",
+    security(("bearer_token" = [])),
+    params(
+        ("id" = uuid::Uuid, Path, description = "Account UUID"),
+    ),
+    responses(
+        (status = 200, description = "Account details", body = crate::models::account::AccountResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Not found"),
+    )
+)]
 #[tracing::instrument(skip(state), fields(user_id = %auth.user_id))]
 pub async fn fetch(
     State(state): State<AppState>,

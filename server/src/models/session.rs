@@ -7,8 +7,9 @@ pub struct DbSession {
     pub id: String,
     pub account_id: String,
     pub key_hash: String,
-    pub allowed_targets: String,   // JSON array
-    pub allowed_selectors: String, // JSON array
+    pub session_key_address: Option<String>, // EOA address of the session key (GAP-003)
+    pub allowed_targets: String,             // JSON array
+    pub allowed_selectors: String,           // JSON array
     pub max_value_wei: String,
     pub expires_at: i64,
     pub created_at: i64,
@@ -31,21 +32,25 @@ impl DbSession {
 
 /// POST /session-key/issue
 /// The client generates the session key; only its hash is sent to the server.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct IssueSessionKeyRequest {
     pub account_id: Uuid,
     /// SHA-256 hash of the session key, computed client-side. Server never sees the key.
     pub key_hash: String,
+    /// EOA address corresponding to the session key (GAP-003).
+    /// Stored after the client confirms on-chain registration.
+    pub session_key_address: Option<String>,
     pub allowed_targets: Vec<String>,
     pub allowed_selectors: Vec<String>,
     pub max_value_wei: String,
     pub ttl_seconds: u64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct SessionKeyResponse {
     pub session_id: Uuid,
     pub key_hash: String,
+    pub session_key_address: Option<String>, // echoed back from request (GAP-003)
     pub expires_at: DateTime<Utc>,
 }
 

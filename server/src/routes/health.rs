@@ -5,6 +5,15 @@ use crate::routes::AppState;
 
 /// GET /health — returns 200 OK when healthy, 503 Service Unavailable when degraded.
 /// #65: DB check + version in response.
+#[utoipa::path(
+    get,
+    path = "/health",
+    tag = "health",
+    responses(
+        (status = 200, description = "Service healthy"),
+        (status = 503, description = "Service degraded"),
+    )
+)]
 #[tracing::instrument(skip(state))]
 pub async fn check(State(state): State<AppState>) -> impl IntoResponse {
     let db_ok = sqlx::query("SELECT 1").execute(&state.db).await.is_ok();

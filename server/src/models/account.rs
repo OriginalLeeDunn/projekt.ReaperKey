@@ -29,14 +29,14 @@ impl DbAccount {
 }
 
 /// POST /account/create — client pre-computes counterfactual address via SDK.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct CreateAccountRequest {
     pub chain: String,
     /// Counterfactual ZeroDev Kernel v3 address, computed by SDK.
     pub address: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct AccountResponse {
     pub account_id: Uuid,
     pub address: String,

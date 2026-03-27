@@ -1,0 +1,92 @@
+/* GitHub-style markdown rendering — dark theme */
+.md-body h1, .md-body h2, .md-body h3, .md-body h4 {
+  color: #e6edf3;
+  font-weight: 600;
+  margin: 1rem 0 0.4rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid #21262d;
+  line-height: 1.35;
+}
+.md-body h1 { font-size: 1.2rem; }
+.md-body h2 { font-size: 1rem; }
+.md-body h3 { font-size: 0.88rem; border-bottom: none; color: #cdd9e5; }
+.md-body h4 { font-size: 0.82rem; border-bottom: none; color: #adbac7; }
+
+.md-body p { margin: 0.45rem 0; color: #cdd9e5; }
+
+.md-body a { color: #4493f8; text-decoration: none; }
+.md-body a:hover { text-decoration: underline; }
+
+.md-body code {
+  background: #1c2128;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.78rem;
+  padding: 0.1em 0.35em;
+  color: #e6edf3;
+}
+
+.md-body pre {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  overflow: auto;
+  margin: 0.6rem 0;
+}
+.md-body pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.76rem;
+  color: #e6edf3;
+  line-height: 1.6;
+}
+
+.md-body ul, .md-body ol {
+  padding-left: 1.4rem;
+  margin: 0.4rem 0;
+  color: #cdd9e5;
+}
+.md-body li { margin: 0.2rem 0; }
+.md-body li input[type="checkbox"] { margin-right: 0.4rem; accent-color: #238636; }
+
+.md-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.6rem 0;
+  font-size: 0.78rem;
+}
+.md-body th {
+  background: #21262d;
+  color: #cdd9e5;
+  font-weight: 600;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #30363d;
+  text-align: left;
+}
+.md-body td {
+  padding: 0.35rem 0.6rem;
+  border: 1px solid #21262d;
+  color: #adbac7;
+}
+.md-body tr:nth-child(even) td { background: #0d1117; }
+
+.md-body strong { color: #e6edf3; font-weight: 600; }
+.md-body em { color: #adbac7; font-style: italic; }
+
+.md-body blockquote {
+  border-left: 3px solid #388bfd;
+  margin: 0.5rem 0;
+  padding: 0.4rem 0.8rem;
+  background: #131c2e;
+  border-radius: 0 4px 4px 0;
+  color: #8b949e;
+}
+
+.md-body hr {
+  border: none;
+  border-top: 1px solid #21262d;
+  margin: 0.9rem 0;
+}

@@ -1,6 +1,7 @@
 use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::error::AppError;
@@ -31,6 +32,14 @@ pub fn issue(
     )
     .map_err(|e| AppError::Internal(format!("jwt encode failed: {e}")))?;
     Ok((token, expires_at))
+}
+
+/// Returns the hex-encoded SHA-256 hash of a raw JWT string.
+/// Used as the primary key in the token_denylist table.
+pub fn token_hash(token: &str) -> String {
+    let mut h = Sha256::new();
+    h.update(token.as_bytes());
+    format!("{:x}", h.finalize())
 }
 
 pub fn validate(token: &str, secret: &str) -> Result<Claims, AppError> {

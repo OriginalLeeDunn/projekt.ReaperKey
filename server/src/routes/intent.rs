@@ -14,6 +14,20 @@ use crate::{
 };
 
 /// POST /intent/execute — SPEC-030, SPEC-034, SPEC-035
+#[utoipa::path(
+    post,
+    path = "/intent/execute",
+    tag = "intent",
+    security(("bearer_token" = [])),
+    request_body = crate::models::intent::ExecuteIntentRequest,
+    responses(
+        (status = 202, description = "Intent accepted and submitted", body = crate::models::intent::IntentResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Session not found"),
+        (status = 429, description = "Rate limited"),
+    )
+)]
 #[tracing::instrument(skip(state, body), fields(user_id = %auth.user_id, session_id = %body.session_id))]
 pub async fn execute(
     State(state): State<AppState>,
@@ -30,7 +44,7 @@ pub async fn execute(
 
     // Load and validate session
     let session: Option<crate::models::session::DbSession> = sqlx::query_as(
-        "SELECT id, account_id, key_hash, allowed_targets, allowed_selectors, max_value_wei, expires_at, created_at
+        "SELECT id, account_id, key_hash, session_key_address, allowed_targets, allowed_selectors, max_value_wei, expires_at, created_at
          FROM sessions WHERE id = ?",
     )
     .bind(body.session_id.to_string())
@@ -76,10 +90,19 @@ pub async fn execute(
         return Err(AppError::Forbidden);
     }
 
+    // Look up the account's chain so we can dispatch to the right adapter
+    let chain_name_row: Option<(String,)> =
+        sqlx::query_as("SELECT chain FROM accounts WHERE id = ?")
+            .bind(&session.account_id)
+            .fetch_optional(&state.db)
+            .await?;
+    let chain = chain_name_row
+        .map(|(c,)| c)
+        .unwrap_or_else(|| "base".to_string());
+
     // Persist intent as pending
     let intent_id = Uuid::new_v4();
     let now = Utc::now().timestamp();
-    let chain = "base"; // v0: Base only
 
     sqlx::query(
         "INSERT INTO intents (id, session_id, chain, target, calldata, value_wei, status, created_at, updated_at)
@@ -87,7 +110,7 @@ pub async fn execute(
     )
     .bind(intent_id.to_string())
     .bind(body.session_id.to_string())
-    .bind(chain)
+    .bind(&chain)
     .bind(&body.target)
     .bind(&body.calldata)
     .bind(&body.value)
@@ -96,11 +119,11 @@ pub async fn execute(
     .execute(&state.db)
     .await?;
 
-    tracing::info!(intent_id = %intent_id, target = %body.target, chain = chain, "intent.submitted");
+    tracing::info!(intent_id = %intent_id, target = %body.target, chain = %chain, "intent.submitted");
 
     // Spawn background task to submit UserOp to Pimlico bundler
     let db = state.db.clone();
-    let chain_adapter = state.chain.clone();
+    let chain_adapter = state.chain_for(&chain);
     let user_op = body.user_operation.clone();
     let id_str = intent_id.to_string();
     tokio::spawn(async move {
@@ -120,6 +143,21 @@ pub async fn execute(
 }
 
 /// GET /intent/:id/status — SPEC-031, SPEC-032, SPEC-033
+#[utoipa::path(
+    get,
+    path = "/intent/{id}/status",
+    tag = "intent",
+    security(("bearer_token" = [])),
+    params(
+        ("id" = uuid::Uuid, Path, description = "Intent UUID"),
+    ),
+    responses(
+        (status = 200, description = "Intent status", body = crate::models::intent::IntentResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Not found"),
+    )
+)]
 #[tracing::instrument(skip(state), fields(user_id = %auth.user_id))]
 pub async fn status(
     State(state): State<AppState>,

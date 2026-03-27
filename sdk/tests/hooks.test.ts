@@ -9,6 +9,42 @@ import { useSendIntent } from '../src/hooks/useSendIntent.js'
 import { useRecovery } from '../src/hooks/useRecovery.js'
 import type { GhostKeyClient } from '../src/client.js'
 
+// ── Mocks for GAP-002 / GAP-003 helpers ──────────────────────────────────────
+
+const FAKE_KERNEL_ADDRESS = '0xCafeBabe0000000000000000000000000000BEEF' as `0x${string}`
+const FAKE_USEROP_HASH = '0xdeadbeef1234' as `0x${string}`
+
+vi.mock('../src/kernel-address.js', () => ({
+  // Inline literal — vi.mock factories are hoisted before const declarations
+  getKernelAddressFromOwner: vi.fn().mockResolvedValue('0xCafeBabe0000000000000000000000000000BEEF'),
+  getKernelAddressFromPrivateKey: vi.fn().mockResolvedValue('0xCafeBabe0000000000000000000000000000BEEF'),
+}))
+
+vi.mock('../src/session-registration.js', () => ({
+  buildSessionKeyRegistrationUserOp: vi.fn().mockResolvedValue({
+    sender: '0xCafeBabe0000000000000000000000000000BEEF',
+    nonce: '0x0',
+    initCode: '0x',
+    callData: '0xdeadbeef',
+    callGasLimit: '0x15f90',
+    verificationGasLimit: '0x186a0',
+    preVerificationGas: '0xc350',
+    maxFeePerGas: '0x3b9aca00',
+    maxPriorityFeePerGas: '0x3b9aca00',
+    paymasterAndData: '0x',
+    signature: '0xsig',
+  }),
+  deriveSessionKeyAddress: vi.fn().mockResolvedValue('0xCafeBabe0000000000000000000000000000BEEF'),
+}))
+
+// Mock bundler fetch for registerSessionKeyOnChain
+vi.stubGlobal(
+  'fetch',
+  vi.fn().mockResolvedValue({
+    json: vi.fn().mockResolvedValue({ jsonrpc: '2.0', id: 1, result: '0xdeadbeef1234' }),
+  }),
+)
+
 // ── Mock client factory ───────────────────────────────────────────────────────
 
 function mockClient(overrides: Partial<GhostKeyClient> = {}): GhostKeyClient {
@@ -189,6 +225,59 @@ describe('useAccount', () => {
     expect(result.current.error?.code).toBe('network_error')
     expect(result.current.loading).toBe(false)
   })
+
+  // GAP-002: createAccountFromOwner
+  it('GAP-002: createAccountFromOwner computes Kernel address and registers it', async () => {
+    const client = mockClient({
+      isAuthenticated: vi.fn(() => true),
+      createAccount: vi.fn().mockResolvedValue({ data: mockAccount, error: null }),
+    })
+    const { result } = renderHook(() => useAccount(), { wrapper: wrapper(client) })
+
+    await act(async () => {
+      await result.current.createAccountFromOwner({
+        ownerAddress: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
+        chainId: 84532,
+        rpcUrl: 'https://rpc.example.com',
+      })
+    })
+
+    expect(result.current.account).toEqual(mockAccount)
+    expect(client.createAccount).toHaveBeenCalledWith(FAKE_KERNEL_ADDRESS)
+  })
+
+  it('GAP-002: createAccountFromOwner rejects when not authenticated', async () => {
+    const client = mockClient({ isAuthenticated: vi.fn(() => false) })
+    const { result } = renderHook(() => useAccount(), { wrapper: wrapper(client) })
+
+    await act(async () => {
+      await result.current.createAccountFromOwner({
+        ownerAddress: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
+        chainId: 84532,
+        rpcUrl: 'https://rpc.example.com',
+      })
+    })
+
+    expect(result.current.error?.code).toBe('not_authenticated')
+  })
+
+  // GAP-002: computeKernelAddress
+  it('GAP-002: computeKernelAddress returns address without registering', async () => {
+    const client = mockClient()
+    const { result } = renderHook(() => useAccount(), { wrapper: wrapper(client) })
+
+    let addr: string | null = null
+    await act(async () => {
+      addr = await result.current.computeKernelAddress({
+        ownerPrivateKey: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
+        chainId: 84532,
+        rpcUrl: 'https://rpc.example.com',
+      })
+    })
+
+    expect(addr).toBe(FAKE_KERNEL_ADDRESS)
+    expect(client.createAccount).not.toHaveBeenCalled()
+  })
 })
 
 // ── useSessionKey ─────────────────────────────────────────────────────────────
@@ -242,6 +331,59 @@ describe('useSessionKey', () => {
     act(() => { result.current.clearSessionKey() })
 
     expect(result.current.sessionKey).toBeNull()
+  })
+
+  // GAP-003: registerSessionKeyOnChain
+  it('GAP-003: registerSessionKeyOnChain returns userOpHash on success', async () => {
+    const client = mockClient()
+    const { result } = renderHook(() => useSessionKey(), { wrapper: wrapper(client) })
+
+    let hash: string | null = null
+    await act(async () => {
+      hash = await result.current.registerSessionKeyOnChain({
+        kernelAddress: FAKE_KERNEL_ADDRESS,
+        sessionKeyPrivateKey: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
+        validAfter: 0,
+        validUntil: 9999999999,
+        chainId: 84532,
+        rpcUrl: 'https://rpc.example.com',
+        bundlerUrl: 'https://bundler.example.com',
+      })
+    })
+
+    expect(hash).toBe(FAKE_USEROP_HASH)
+    expect(result.current.error).toBeNull()
+  })
+
+  it('GAP-003: registerSessionKeyOnChain sets error on bundler failure', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        json: vi.fn().mockResolvedValue({
+          jsonrpc: '2.0', id: 1,
+          error: { message: 'insufficient funds' },
+        }),
+      }),
+    )
+
+    const client = mockClient()
+    const { result } = renderHook(() => useSessionKey(), { wrapper: wrapper(client) })
+
+    let hash: string | null = 'sentinel'
+    await act(async () => {
+      hash = await result.current.registerSessionKeyOnChain({
+        kernelAddress: FAKE_KERNEL_ADDRESS,
+        sessionKeyPrivateKey: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
+        validAfter: 0,
+        validUntil: 9999999999,
+        chainId: 84532,
+        rpcUrl: 'https://rpc.example.com',
+        bundlerUrl: 'https://bundler.example.com',
+      })
+    })
+
+    expect(hash).toBeNull()
+    expect(result.current.error?.code).toBe('unknown')
   })
 })
 

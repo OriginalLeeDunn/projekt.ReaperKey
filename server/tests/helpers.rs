@@ -51,11 +51,15 @@ pub async fn test_server_and_db_with_bundler(
                 paymaster_url: paymaster_url.to_string(),
                 entry_point: "0x0000000071727De22E5E9d8BAf0edAc6f37da032".to_string(),
             },
+            arbitrum: None,
+            ethereum: None,
         },
     };
 
     let pool = db::connect(&config.database.url).await.expect("test db");
-    db::migrate(&pool).await.expect("test migrations");
+    db::migrate(&pool, &config.database.url)
+        .await
+        .expect("test migrations");
     let app = routes::build(pool.clone(), config);
     (TestServer::new(app).expect("test server"), pool)
 }
