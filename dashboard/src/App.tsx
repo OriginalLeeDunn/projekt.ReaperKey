@@ -15,7 +15,7 @@ function MarkdownView({ content, maxHeight = 500 }: { content: string; maxHeight
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const S = {
-  page: { background: '#0a0a0a', minHeight: '100vh', color: '#e0e0e0', fontFamily: 'system-ui, sans-serif' } as React.CSSProperties,
+  page: { background: '#0a0a0a', minHeight: '100vh', color: '#e0e0e0', fontFamily: 'system-ui, sans-serif', overflowX: 'hidden' } as React.CSSProperties,
   header: { background: '#111', borderBottom: '1px solid #222', padding: '0.75rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' } as React.CSSProperties,
   headerTitle: { fontSize: '0.95rem', fontWeight: 700, letterSpacing: '0.05em', color: '#fff' } as React.CSSProperties,
   headerSub: { fontSize: '0.7rem', color: '#555' } as React.CSSProperties,
@@ -35,10 +35,10 @@ const S = {
     userSelect: 'none' as const,
     whiteSpace: 'nowrap' as const,
   }),
-  body: { padding: '1rem 1.5rem', maxWidth: 1600, margin: '0 auto' } as React.CSSProperties,
-  grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' } as React.CSSProperties,
-  grid3: { display: 'grid', gridTemplateColumns: '320px 1fr 1fr', gap: '1rem' } as React.CSSProperties,
-  grid4: { display: 'grid', gridTemplateColumns: '260px 1fr 1fr 1fr', gap: '1rem' } as React.CSSProperties,
+  body: { padding: '1rem 1.5rem', maxWidth: 1600, margin: '0 auto', overflow: 'hidden', boxSizing: 'border-box' as const, width: '100%' } as React.CSSProperties,
+  grid2: { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '1rem' } as React.CSSProperties,
+  grid3: { display: 'grid', gridTemplateColumns: '320px minmax(0,1fr) minmax(0,1fr)', gap: '1rem' } as React.CSSProperties,
+  grid4: { display: 'grid', gridTemplateColumns: '260px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)', gap: '1rem' } as React.CSSProperties,
   col: { display: 'flex', flexDirection: 'column' as const, gap: '1rem' } as React.CSSProperties,
   card: { background: '#141414', border: '1px solid #222', borderRadius: 8, padding: '1rem' } as React.CSSProperties,
   cardTitle: { fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: '#555', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' } as React.CSSProperties,
@@ -801,6 +801,288 @@ function GovernancePanel() {
 // ── Activity Log Panel ────────────────────────────────────────────────────────
 interface ActivityEntry { ts: string; agent: string; action: string; detail: string; status: string }
 
+// Agent color palette (stable by index in known list)
+const AGENT_COLORS: Record<string, string> = {
+  Claude: '#818cf8',
+  Orchestrator: '#38bdf8',
+  'Backend Engineer': '#34d399',
+  'SDK Engineer': '#a78bfa',
+  'QA Engineer': '#fb923c',
+  'DevOps Agent': '#f472b6',
+  'Docs Agent': '#facc15',
+  'Security Lead': '#f87171',
+  Architect: '#60a5fa',
+  'Release Manager': '#4ade80',
+  'PR Manager': '#c084fc',
+  Governor: '#e879f9',
+  'Monitor Agent': '#22d3ee',
+  'Contract Engineer': '#fbbf24',
+  'Dep Scanner': '#a3e635',
+  'Audit Lead': '#ff6b6b',
+  'Compliance Officer': '#94a3b8',
+  Founder: '#f59e0b',
+}
+function agentColor(agent: string) { return AGENT_COLORS[agent] ?? '#6b7280' }
+
+// Detail modal
+function ActivityModal({ entry, onClose }: { entry: ActivityEntry; onClose: () => void }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+  const statusColor = (s: string) => s === 'ok' || s === 'success' ? 'green' : s === 'error' || s === 'failed' ? 'red' : 'yellow'
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+      onClick={onClose}>
+      <div style={{ background: '#141414', border: '1px solid #333', borderRadius: 10, padding: '1.5rem', maxWidth: 560, width: '100%', boxShadow: '0 24px 64px rgba(0,0,0,0.8)' }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+          <div>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: agentColor(entry.agent) }}>{entry.agent}</span>
+            <span style={{ ...S.badge(statusColor(entry.status)), marginLeft: '0.5rem' }}>{entry.status}</span>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1 }}>×</button>
+        </div>
+        <div style={{ fontSize: '0.9rem', color: '#e0e0e0', fontWeight: 600, marginBottom: '0.5rem' }}>{entry.action}</div>
+        {entry.detail && (
+          <div style={{ ...S.pre, fontSize: '0.75rem', marginBottom: '0.75rem', maxHeight: 220 }}>{entry.detail}</div>
+        )}
+        <div style={{ ...S.mono, fontSize: '0.65rem', color: '#444' }}>{new Date(entry.ts).toLocaleString()} UTC</div>
+      </div>
+    </div>
+  )
+}
+
+// Feed sub-view
+function FeedView({ entries, loading, agentFilter, agents, onFilterChange, onRefresh, liveConnected }: {
+  entries: ActivityEntry[]; loading: boolean; agentFilter: string; agents: string[];
+  onFilterChange: (v: string) => void; onRefresh: () => void; liveConnected: boolean
+}) {
+  const [modal, setModal] = useState<ActivityEntry | null>(null)
+  const statusColor = (s: string) => s === 'ok' || s === 'success' ? 'green' : s === 'error' || s === 'failed' ? 'red' : 'yellow'
+  const filtered = agentFilter === 'All' ? entries : entries.filter(e => e.agent === agentFilter)
+
+  return (
+    <>
+      {modal && <ActivityModal entry={modal} onClose={() => setModal(null)} />}
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap' as const }}>
+        <span style={{ ...S.badge(liveConnected ? 'green' : 'grey'), fontSize: '0.65rem' }}>
+          {liveConnected ? '● LIVE' : '○ offline'}
+        </span>
+        <select style={{ ...S.select, marginBottom: 0, fontSize: '0.72rem' }} value={agentFilter} onChange={e => onFilterChange(e.target.value)}>
+          {agents.map(a => <option key={a}>{a}</option>)}
+        </select>
+        <button onClick={onRefresh} style={{ marginLeft: 'auto', background: 'none', border: '1px solid #333', borderRadius: 3, color: '#555', fontSize: '0.62rem', padding: '0.1rem 0.4rem', cursor: 'pointer' }}>↻</button>
+      </div>
+      {loading && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
+      {!loading && filtered.length === 0 && <div style={{ color: '#444', fontSize: '0.8rem' }}>No activity yet.</div>}
+      <div style={{ overflowY: 'auto' as const, flex: 1 }}>
+        {filtered.map((e, i) => (
+          <div key={i} onClick={() => setModal(e)}
+            style={{ display: 'flex', gap: '0.6rem', padding: '0.45rem 0.4rem', borderBottom: '1px solid #1a1a1a', alignItems: 'flex-start', cursor: 'pointer', borderRadius: 4, transition: 'background 0.1s' }}
+            onMouseEnter={el => (el.currentTarget.style.background = '#1a1a1a')}
+            onMouseLeave={el => (el.currentTarget.style.background = 'transparent')}>
+            <span style={S.badge(statusColor(e.status))}>{e.status}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' as const }}>
+                <span style={{ fontSize: '0.72rem', color: agentColor(e.agent), fontWeight: 700 }}>{e.agent}</span>
+                <span style={{ fontSize: '0.75rem', color: '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, maxWidth: 400 }}>{e.action}</span>
+              </div>
+              {e.detail && <div style={{ ...S.mono, fontSize: '0.65rem', marginTop: '0.1rem', color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{e.detail}</div>}
+              <div style={{ ...S.mono, fontSize: '0.6rem', color: '#2a2a2a', marginTop: '0.1rem' }}>{new Date(e.ts).toLocaleString()}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
+// Stats sub-view
+interface AgentStats { agent: string; count: number; lastSeen: string; topAction: string; errorCount: number }
+function StatsView({ entries }: { entries: ActivityEntry[] }) {
+  const agentMap = new Map<string, AgentStats>()
+  for (const e of entries) {
+    const s = agentMap.get(e.agent) ?? { agent: e.agent, count: 0, lastSeen: e.ts, topAction: e.action, errorCount: 0 }
+    s.count++
+    if (e.ts > s.lastSeen) { s.lastSeen = e.ts; s.topAction = e.action }
+    if (e.status === 'error' || e.status === 'failed') s.errorCount++
+    agentMap.set(e.agent, s)
+  }
+  const stats = Array.from(agentMap.values()).sort((a, b) => b.count - a.count)
+  const total = entries.length
+  const errors = entries.filter(e => e.status === 'error' || e.status === 'failed').length
+  const agents_active = stats.length
+  const last24h = entries.filter(e => Date.now() - new Date(e.ts).getTime() < 86400000).length
+
+  return (
+    <div style={{ overflowY: 'auto' as const, flex: 1 }}>
+      {/* Global totals bar */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
+        {[
+          { label: 'Total Events', value: total, color: '#60a5fa' },
+          { label: 'Active Agents', value: agents_active, color: '#34d399' },
+          { label: 'Last 24h', value: last24h, color: '#a78bfa' },
+          { label: 'Errors', value: errors, color: errors > 0 ? '#f87171' : '#444' },
+        ].map(item => (
+          <div key={item.label} style={{ background: '#0f0f0f', border: '1px solid #1e1e1e', borderRadius: 6, padding: '0.75rem', textAlign: 'center' as const }}>
+            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: item.color, fontFamily: 'monospace' }}>{item.value}</div>
+            <div style={{ fontSize: '0.62rem', color: '#444', textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginTop: '0.2rem' }}>{item.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Per-agent cards */}
+      {stats.length === 0 && <div style={{ color: '#444', fontSize: '0.8rem' }}>No activity logged yet.</div>}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '0.75rem' }}>
+        {stats.map(s => (
+          <div key={s.agent} style={{ background: '#0f0f0f', border: `1px solid ${agentColor(s.agent)}33`, borderRadius: 8, padding: '0.85rem', position: 'relative' as const }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: agentColor(s.agent) }}>{s.agent}</span>
+              <span style={{ fontSize: '1rem', fontWeight: 700, fontFamily: 'monospace', color: '#e0e0e0' }}>{s.count}</span>
+            </div>
+            <div style={{ ...S.mono, fontSize: '0.65rem', color: '#555', marginBottom: '0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
+              Last: {s.topAction}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ ...S.mono, fontSize: '0.6rem', color: '#333' }}>{new Date(s.lastSeen).toLocaleString()}</div>
+              {s.errorCount > 0 && <span style={S.badge('red')}>{s.errorCount} err</span>}
+            </div>
+            {/* activity bar */}
+            <div style={{ marginTop: '0.5rem', height: 3, background: '#1a1a1a', borderRadius: 2, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${Math.min(100, (s.count / Math.max(1, total)) * 100 * 5)}%`, background: agentColor(s.agent), borderRadius: 2, opacity: 0.7 }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Graph sub-view — SVG circular layout
+function GraphView({ entries, onNodeClick, nodeFilter }: { entries: ActivityEntry[]; onNodeClick: (agent: string) => void; nodeFilter: string }) {
+  const now = Date.now()
+  // count activity per agent
+  const counts = new Map<string, number>()
+  const lastSeen = new Map<string, number>()
+  for (const e of entries) {
+    counts.set(e.agent, (counts.get(e.agent) ?? 0) + 1)
+    const t = new Date(e.ts).getTime()
+    if (!lastSeen.has(e.agent) || t > lastSeen.get(e.agent)!) lastSeen.set(e.agent, t)
+  }
+
+  const allAgents = Array.from(new Set(['Claude', ...entries.map(e => e.agent)])).filter(a => a !== 'Claude')
+  const cx = 380, cy = 230, r = 165
+
+  // pulse opacity based on recency (last 60s = 1.0, last 10min = 0.3, older = 0.1)
+  function pulseOpacity(agent: string) {
+    const t = lastSeen.get(agent)
+    if (!t) return 0.1
+    const age = now - t
+    if (age < 60000) return 1.0
+    if (age < 600000) return 0.3 + 0.7 * (1 - age / 600000)
+    return 0.1
+  }
+
+  const claudeActive = pulseOpacity('Claude') > 0.3
+
+  return (
+    <div style={{ overflowY: 'auto' as const, flex: 1, display: 'flex', flexDirection: 'column' as const, gap: '0.75rem' }}>
+      <div style={{ background: '#0a0a0a', border: '1px solid #1e1e1e', borderRadius: 8, overflow: 'hidden', display: 'flex', justifyContent: 'center' }}>
+        <svg width="760" height="460" viewBox="0 0 760 460" style={{ maxWidth: '100%', display: 'block' }}>
+          {/* Outer ring */}
+          <circle cx={cx} cy={cy} r={r + 20} fill="none" stroke="#1a1a1a" strokeWidth={1} strokeDasharray="4 4" />
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke="#111" strokeWidth={1} />
+
+          {/* Edges from Claude to active agents */}
+          {allAgents.map((agent, i) => {
+            const angle = (i / allAgents.length) * Math.PI * 2 - Math.PI / 2
+            const ax = cx + r * Math.cos(angle)
+            const ay = cy + r * Math.sin(angle)
+            const op = pulseOpacity(agent)
+            if (op < 0.15) return null
+            return (
+              <line key={agent}
+                x1={cx} y1={cy} x2={ax} y2={ay}
+                stroke={agentColor(agent)}
+                strokeOpacity={op * 0.5}
+                strokeWidth={op > 0.5 ? 1.5 : 0.75}
+                strokeDasharray={op > 0.8 ? undefined : '3 5'}
+              />
+            )
+          })}
+
+          {/* Claude center node */}
+          <circle cx={cx} cy={cy} r={30} fill="#1a1a2e" stroke={claudeActive ? '#818cf8' : '#2a2a3e'} strokeWidth={claudeActive ? 2 : 1} />
+          {claudeActive && <circle cx={cx} cy={cy} r={38} fill="none" stroke="#818cf8" strokeWidth={0.5} strokeOpacity={0.4} />}
+          <text x={cx} y={cy - 4} textAnchor="middle" fill="#818cf8" fontSize={11} fontWeight="700" fontFamily="system-ui">Claude</text>
+          <text x={cx} y={cy + 10} textAnchor="middle" fill="#4a4a6a" fontSize={8} fontFamily="monospace">{counts.get('Claude') ?? 0} ops</text>
+
+          {/* Agent nodes */}
+          {allAgents.map((agent, i) => {
+            const angle = (i / allAgents.length) * Math.PI * 2 - Math.PI / 2
+            const ax = cx + r * Math.cos(angle)
+            const ay = cy + r * Math.sin(angle)
+            const op = pulseOpacity(agent)
+            const isFiltered = nodeFilter !== 'All' && nodeFilter !== agent
+            const col = agentColor(agent)
+            const cnt = counts.get(agent) ?? 0
+
+            return (
+              <g key={agent} style={{ cursor: 'pointer' }} onClick={() => onNodeClick(nodeFilter === agent ? 'All' : agent)}>
+                {op > 0.5 && <circle cx={ax} cy={ay} r={20} fill="none" stroke={col} strokeWidth={0.5} strokeOpacity={0.3} />}
+                <circle cx={ax} cy={ay} r={14}
+                  fill={isFiltered ? '#0f0f0f' : `${col}22`}
+                  stroke={col}
+                  strokeWidth={nodeFilter === agent ? 2.5 : 1}
+                  strokeOpacity={isFiltered ? 0.2 : op}
+                />
+                <text x={ax} y={ay + 4} textAnchor="middle" fill={col} fontSize={9} fontWeight="600" fontFamily="monospace" fillOpacity={isFiltered ? 0.3 : 1}>
+                  {cnt}
+                </text>
+                {/* label */}
+                {(() => {
+                  const labelY = ay + (ay > cy ? 28 : -20)
+                  const shortName = agent.split(' ').map((w: string) => w[0]).join('').slice(0, 4)
+                  return (
+                    <text x={ax} y={labelY} textAnchor="middle" fill={col} fontSize={7.5} fontFamily="system-ui" fillOpacity={isFiltered ? 0.2 : 0.85}>
+                      {agent.length > 12 ? shortName : agent}
+                    </text>
+                  )
+                })()}
+              </g>
+            )
+          })}
+        </svg>
+      </div>
+
+      {/* Legend */}
+      <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '0.4rem' }}>
+        {allAgents.filter(a => (counts.get(a) ?? 0) > 0).map(agent => (
+          <button key={agent} onClick={() => onNodeClick(nodeFilter === agent ? 'All' : agent)}
+            style={{ background: nodeFilter === agent ? `${agentColor(agent)}22` : '#0f0f0f', border: `1px solid ${agentColor(agent)}${nodeFilter === agent ? 'aa' : '44'}`, borderRadius: 4, color: agentColor(agent), fontSize: '0.65rem', padding: '0.15rem 0.5rem', cursor: 'pointer', fontWeight: nodeFilter === agent ? 700 : 400 }}>
+            {agent} <span style={{ opacity: 0.6 }}>{counts.get(agent)}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Recent activity for selected agent */}
+      {nodeFilter !== 'All' && (
+        <div style={{ ...S.card, padding: '0.75rem' }}>
+          <div style={{ ...S.cardTitle, color: agentColor(nodeFilter) }}>{nodeFilter} — Recent</div>
+          {entries.filter(e => e.agent === nodeFilter).slice(0, 8).map((e, i) => (
+            <div key={i} style={{ ...S.mono, fontSize: '0.68rem', color: '#666', marginBottom: '0.2rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
+              <span style={{ color: '#333' }}>{new Date(e.ts).toLocaleTimeString()} </span>{e.action}
+              {e.detail && <span style={{ color: '#444' }}> · {e.detail}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ActivityPanel() {
   const [entries, setEntries] = useState<ActivityEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -811,29 +1093,49 @@ function ActivityPanel() {
   const [logStatus, setLogStatus] = useState('ok')
   const [posting, setPosting] = useState(false)
   const [liveConnected, setLiveConnected] = useState(false)
+  const [view, setView] = useState<'feed' | 'stats' | 'graph'>('feed')
+  const esRef = useRef<EventSource | null>(null)
+  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reconnectDelay = useRef(1000)
 
   const load = useCallback(() => {
     setLoading(true)
     fetch('/api/activity').then(r => r.json()).then(d => { setEntries(Array.isArray(d) ? d : []); setLoading(false) }).catch(() => setLoading(false))
   }, [])
 
-  // Initial load + SSE live stream
-  useEffect(() => {
-    load()
+  // SSE with auto-reconnect backoff
+  const connectSSE = useCallback(() => {
+    if (esRef.current) { esRef.current.close(); esRef.current = null }
     const es = new EventSource('/api/stream/activity')
-    es.onopen = () => setLiveConnected(true)
-    es.onerror = () => setLiveConnected(false)
+    esRef.current = es
+    es.onopen = () => { setLiveConnected(true); reconnectDelay.current = 1000 }
+    es.onerror = () => {
+      setLiveConnected(false)
+      es.close()
+      esRef.current = null
+      reconnectTimer.current = setTimeout(() => {
+        reconnectDelay.current = Math.min(reconnectDelay.current * 2, 30000)
+        connectSSE()
+      }, reconnectDelay.current)
+    }
     es.onmessage = (e) => {
       try {
         const entry: ActivityEntry = JSON.parse(e.data)
         setEntries(prev => [entry, ...prev].slice(0, 200))
       } catch { /* ignore */ }
     }
-    return () => es.close()
-  }, [load])
+  }, [])
+
+  useEffect(() => {
+    load()
+    connectSSE()
+    return () => {
+      esRef.current?.close()
+      if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
+    }
+  }, [load, connectSSE])
 
   const agents = ['All', ...Array.from(new Set(entries.map(e => e.agent)))]
-  const filtered = agentFilter === 'All' ? entries : entries.filter(e => e.agent === agentFilter)
 
   async function postEntry() {
     if (!logAction) return
@@ -844,64 +1146,77 @@ function ActivityPanel() {
     setPosting(false)
   }
 
-  const statusColor = (s: string) => s === 'ok' || s === 'success' ? 'green' : s === 'error' || s === 'failed' ? 'red' : 'yellow'
+  const viewBtnStyle = (v: string) => ({
+    background: view === v ? '#1e3a5f' : 'none',
+    border: `1px solid ${view === v ? '#2563eb' : '#222'}`,
+    borderRadius: 4, color: view === v ? '#60a5fa' : '#444',
+    fontSize: '0.72rem', padding: '0.3rem 0.75rem', cursor: 'pointer', fontWeight: view === v ? 700 : 400,
+  }) as React.CSSProperties
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '1rem' }}>
-      {/* Log entry composer */}
-      <div style={S.card}>
-        <div style={S.cardTitle}>Log Activity</div>
-        <div style={S.sectionLabel}>Agent</div>
-        <select style={{ ...S.select, width: '100%' }} value={logAgent} onChange={e => setLogAgent(e.target.value)}>
-          {['Founder', ...AGENT_LIST].map(a => <option key={a}>{a}</option>)}
-        </select>
-        <div style={S.sectionLabel}>Action</div>
-        <input style={S.input} placeholder="e.g. merged PR #115 to dev" value={logAction} onChange={e => setLogAction(e.target.value)} />
-        <div style={S.sectionLabel}>Detail</div>
-        <input style={S.input} placeholder="optional detail" value={logDetail} onChange={e => setLogDetail(e.target.value)} />
-        <div style={S.sectionLabel}>Status</div>
-        <select style={{ ...S.select, width: '100%' }} value={logStatus} onChange={e => setLogStatus(e.target.value)}>
-          <option value="ok">ok</option>
-          <option value="success">success</option>
-          <option value="warning">warning</option>
-          <option value="error">error</option>
-          <option value="failed">failed</option>
-        </select>
-        <button style={S.btn(posting || !logAction)} onClick={postEntry} disabled={posting || !logAction}>
-          {posting ? 'Logging...' : 'Log Entry'}
-        </button>
+    <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: '1rem', minHeight: 0 }}>
+      {/* Sidebar: composer + view switcher */}
+      <div style={{ ...S.col, minWidth: 0 }}>
+        {/* View switcher */}
+        <div style={S.card}>
+          <div style={S.cardTitle}>View</div>
+          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '0.4rem' }}>
+            <button style={viewBtnStyle('feed')} onClick={() => setView('feed')}>Feed</button>
+            <button style={viewBtnStyle('stats')} onClick={() => setView('stats')}>Stats</button>
+            <button style={viewBtnStyle('graph')} onClick={() => setView('graph')}>Graph</button>
+          </div>
+        </div>
+        {/* Log entry composer */}
+        <div style={S.card}>
+          <div style={S.cardTitle}>Log Activity</div>
+          <div style={S.sectionLabel}>Agent</div>
+          <select style={{ ...S.select, width: '100%' }} value={logAgent} onChange={e => setLogAgent(e.target.value)}>
+            {['Founder', ...AGENT_LIST].map(a => <option key={a}>{a}</option>)}
+          </select>
+          <div style={S.sectionLabel}>Action</div>
+          <input style={S.input} placeholder="e.g. merged PR #115" value={logAction} onChange={e => setLogAction(e.target.value)} />
+          <div style={S.sectionLabel}>Detail</div>
+          <input style={S.input} placeholder="optional" value={logDetail} onChange={e => setLogDetail(e.target.value)} />
+          <div style={S.sectionLabel}>Status</div>
+          <select style={{ ...S.select, width: '100%' }} value={logStatus} onChange={e => setLogStatus(e.target.value)}>
+            <option value="ok">ok</option>
+            <option value="success">success</option>
+            <option value="warning">warning</option>
+            <option value="error">error</option>
+            <option value="failed">failed</option>
+          </select>
+          <button style={S.btn(posting || !logAction)} onClick={postEntry} disabled={posting || !logAction}>
+            {posting ? 'Logging...' : 'Log Entry'}
+          </button>
+        </div>
       </div>
 
-      {/* Activity feed */}
-      <div style={S.card}>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap' as const }}>
+      {/* Main view area */}
+      <div style={{ ...S.card, display: 'flex', flexDirection: 'column' as const, minHeight: 0, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.75rem', borderBottom: '1px solid #1a1a1a', paddingBottom: '0.65rem', flexWrap: 'wrap' as const }}>
           <div style={S.cardTitle}>
-            Activity Feed
-            <span style={{ ...S.badge(liveConnected ? 'green' : 'grey'), display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+            Activity
+            <span style={{ ...S.badge(liveConnected ? 'green' : 'grey'), fontSize: '0.6rem' }}>
               {liveConnected ? '● LIVE' : '○ offline'}
             </span>
           </div>
-          <select style={{ ...S.select, marginBottom: 0, fontSize: '0.72rem' }} value={agentFilter} onChange={e => setAgentFilter(e.target.value)}>
-            {agents.map(a => <option key={a}>{a}</option>)}
-          </select>
-          <button onClick={load} style={{ marginLeft: 'auto', background: 'none', border: '1px solid #333', borderRadius: 3, color: '#555', fontSize: '0.62rem', padding: '0.1rem 0.4rem', cursor: 'pointer' }}>↻</button>
+          <div style={{ marginLeft: 'auto', fontSize: '0.68rem', color: '#444' }}>{entries.length} entries</div>
         </div>
-        {loading && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
-        {!loading && filtered.length === 0 && <div style={{ color: '#444', fontSize: '0.8rem' }}>No activity logged yet.</div>}
-        <div style={{ maxHeight: 560, overflowY: 'auto' as const }}>
-          {filtered.map((e, i) => (
-            <div key={i} style={{ display: 'flex', gap: '0.6rem', padding: '0.4rem 0', borderBottom: '1px solid #1a1a1a', alignItems: 'flex-start' }}>
-              <span style={S.badge(statusColor(e.status))}>{e.status}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' as const }}>
-                  <span style={{ fontSize: '0.72rem', color: '#93c5fd', fontWeight: 600 }}>{e.agent}</span>
-                  <span style={{ fontSize: '0.75rem', color: '#ccc' }}>{e.action}</span>
-                </div>
-                {e.detail && <div style={{ ...S.mono, fontSize: '0.68rem', marginTop: '0.1rem', color: '#555' }}>{e.detail}</div>}
-                <div style={{ ...S.mono, fontSize: '0.62rem', color: '#333', marginTop: '0.1rem' }}>{new Date(e.ts).toLocaleString()}</div>
-              </div>
-            </div>
-          ))}
+
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' as const, overflowY: 'auto' as const, maxHeight: 'calc(100vh - 280px)' }}>
+          {view === 'feed' && (
+            <FeedView
+              entries={entries}
+              loading={loading}
+              agentFilter={agentFilter}
+              agents={agents}
+              onFilterChange={setAgentFilter}
+              onRefresh={load}
+              liveConnected={liveConnected}
+            />
+          )}
+          {view === 'stats' && <StatsView entries={entries} />}
+          {view === 'graph' && <GraphView entries={entries} onNodeClick={setAgentFilter} nodeFilter={agentFilter} />}
         </div>
       </div>
     </div>
@@ -956,7 +1271,7 @@ export default function App() {
       <div style={S.body}>
         {activeTab === 'overview' && (
           <div style={S.col}>
-            <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr 1fr', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0,1fr) minmax(0,1fr)', gap: '1rem' }}>
               <HealthPanel />
               <CIPanel />
               <PRPanel />
