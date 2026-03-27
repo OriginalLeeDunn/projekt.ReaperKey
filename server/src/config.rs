@@ -85,7 +85,7 @@ fn default_port() -> u16 {
     8080
 }
 fn default_db_url() -> String {
-    "sqlite:./ghostkey.db".to_string()
+    "sqlite:./db/ghostkey.db".to_string()
 }
 fn default_session_ttl() -> u64 {
     3600

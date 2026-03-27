@@ -55,7 +55,7 @@ migrate: ## Run database migrations
 	cargo run --bin ghostkey-server -- migrate
 
 migrate-dry: ## Preview migrations without running
-	sqlx migrate info --database-url sqlite:./ghostkey.db
+	sqlx migrate info --database-url sqlite:./db/ghostkey.db
 
 # ── CI (runs everything) ─────────────────────────────────────────────────────
 
