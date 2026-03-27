@@ -7,6 +7,7 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::{
+    activity::{ActivityEntry, ActivityLogger},
     error::{AppError, AppResult},
     middleware::AuthUser,
     models::intent::{DbIntent, ExecuteIntentRequest, IntentResponse, IntentStatus},
@@ -120,14 +121,25 @@ pub async fn execute(
     .await?;
 
     tracing::info!(intent_id = %intent_id, target = %body.target, chain = %chain, "intent.submitted");
+    state.activity.emit(
+        ActivityEntry::backend(
+            "intent.submitted",
+            "intent accepted for bundler submission",
+            "ok",
+        )
+        .with_user(auth.user_id)
+        .with_chain(chain.clone())
+        .with_meta(serde_json::json!({ "intent_id": intent_id })),
+    );
 
     // Spawn background task to submit UserOp to Pimlico bundler
     let db = state.db.clone();
     let chain_adapter = state.chain_for(&chain);
     let user_op = body.user_operation.clone();
     let id_str = intent_id.to_string();
+    let activity = state.activity.clone();
     tokio::spawn(async move {
-        submit_to_bundler(db, chain_adapter, id_str, user_op).await;
+        submit_to_bundler(db, chain_adapter, id_str, user_op, activity).await;
     });
 
     Ok((
@@ -203,12 +215,19 @@ async fn submit_to_bundler(
     chain: std::sync::Arc<crate::chain::ChainAdapter>,
     intent_id: String,
     user_op: serde_json::Value,
+    activity: std::sync::Arc<ActivityLogger>,
 ) {
     // Attempt paymaster sponsorship
     let sponsored = match chain.sponsor_user_operation(&user_op).await {
         Ok(op) => op,
         Err(e) => {
             tracing::warn!(intent_id = %intent_id, error = %e, "paymaster sponsorship failed");
+            activity.emit(
+                ActivityEntry::backend("intent.failed", "paymaster sponsorship failed", "error")
+                    .with_meta(
+                        serde_json::json!({ "intent_id": intent_id, "reason": "paymaster_failed" }),
+                    ),
+            );
             update_intent_status(
                 &db,
                 &intent_id,
@@ -227,6 +246,12 @@ async fn submit_to_bundler(
         Ok(h) => h,
         Err(e) => {
             tracing::warn!(intent_id = %intent_id, error = %e, "bundler submission failed");
+            activity.emit(
+                ActivityEntry::backend("intent.failed", "bundler submission failed", "error")
+                    .with_meta(
+                        serde_json::json!({ "intent_id": intent_id, "reason": "bundler_rejected" }),
+                    ),
+            );
             update_intent_status(
                 &db,
                 &intent_id,
@@ -250,6 +275,14 @@ async fn submit_to_bundler(
     )
     .await;
     tracing::info!(intent_id = %intent_id, user_op_hash = %user_op_hash, "intent.bundler_submitted");
+    activity.emit(
+        ActivityEntry::backend(
+            "intent.bundler_submitted",
+            "UserOp submitted to bundler",
+            "ok",
+        )
+        .with_meta(serde_json::json!({ "intent_id": intent_id, "user_op_hash": user_op_hash })),
+    );
 
     // Poll for receipt (30 attempts × 2s = 60s max)
     for _ in 0..30 {
@@ -269,6 +302,14 @@ async fn submit_to_bundler(
                 )
                 .await;
                 tracing::info!(intent_id = %intent_id, "intent.confirmed");
+                activity.emit(
+                    ActivityEntry::backend("intent.confirmed", "intent confirmed on-chain", "ok")
+                        .with_meta(serde_json::json!({
+                            "intent_id": intent_id,
+                            "user_op_hash": user_op_hash,
+                            "block_number": block,
+                        })),
+                );
                 return;
             }
             Ok(None) => continue,
@@ -281,6 +322,14 @@ async fn submit_to_bundler(
 
     // Timed out
     tracing::warn!(intent_id = %intent_id, "intent.poll_timeout");
+    activity.emit(
+        ActivityEntry::backend(
+            "intent.poll_timeout",
+            "intent polling timed out after 60s",
+            "warn",
+        )
+        .with_meta(serde_json::json!({ "intent_id": intent_id })),
+    );
     update_intent_status(
         &db,
         &intent_id,

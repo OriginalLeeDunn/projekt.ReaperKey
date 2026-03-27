@@ -7,6 +7,7 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::{
+    activity::ActivityEntry,
     error::{AppError, AppResult},
     middleware::AuthUser,
     models::account::{AccountResponse, CreateAccountRequest, DbAccount},
@@ -68,6 +69,16 @@ pub async fn create(
     .await?;
 
     tracing::info!(account_id = %account_id, chain = %body.chain, "account.create");
+    state.activity.emit(
+        ActivityEntry::backend(
+            "account.created",
+            format!("smart account registered on {}", body.chain),
+            "ok",
+        )
+        .with_user(auth.user_id)
+        .with_chain(body.chain.clone())
+        .with_meta(serde_json::json!({ "account_id": account_id, "aa_type": "kernel" })),
+    );
     Ok((
         StatusCode::CREATED,
         Json(AccountResponse {

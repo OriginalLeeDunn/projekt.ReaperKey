@@ -799,7 +799,23 @@ function GovernancePanel() {
 }
 
 // ── Activity Log Panel ────────────────────────────────────────────────────────
-interface ActivityEntry { ts: string; agent: string; action: string; detail: string; status: string }
+interface ActivityEntry {
+  ts: string; agent: string; action: string; detail: string; status: string
+  event_type?: string   // "backend" | "agent" | "claude" | "ci"
+  user_id?: string
+  chain?: string
+  meta?: Record<string, unknown>
+}
+
+const EVENT_TYPE_CONFIG: Record<string, { badge: string; color: string }> = {
+  backend: { badge: 'API', color: '#10b981' },
+  agent:   { badge: 'AGT', color: '#f59e0b' },
+  claude:  { badge: 'CC',  color: '#818cf8' },
+  ci:      { badge: 'CI',  color: '#64748b' },
+}
+function eventTypeCfg(e: ActivityEntry) {
+  return EVENT_TYPE_CONFIG[e.event_type ?? 'agent'] ?? EVENT_TYPE_CONFIG.agent
+}
 
 // Agent color palette (stable by index in known list)
 const AGENT_COLORS: Record<string, string> = {
@@ -848,6 +864,14 @@ function ActivityModal({ entry, onClose }: { entry: ActivityEntry; onClose: () =
         {entry.detail && (
           <div style={{ ...S.pre, fontSize: '0.75rem', marginBottom: '0.75rem', maxHeight: 220 }}>{entry.detail}</div>
         )}
+        {entry.chain && (
+          <div style={{ marginBottom: '0.4rem' }}>
+            <span style={{ ...S.mono, fontSize: '0.65rem', color: '#60a5fa', background: '#1e3a5f', padding: '2px 6px', borderRadius: 3 }}>chain: {entry.chain}</span>
+          </div>
+        )}
+        {entry.meta && Object.keys(entry.meta).length > 0 && (
+          <div style={{ ...S.pre, fontSize: '0.72rem', marginBottom: '0.75rem', maxHeight: 140 }}>{JSON.stringify(entry.meta, null, 2)}</div>
+        )}
         <div style={{ ...S.mono, fontSize: '0.65rem', color: '#444' }}>{new Date(entry.ts).toLocaleString()} UTC</div>
       </div>
     </div>
@@ -855,45 +879,83 @@ function ActivityModal({ entry, onClose }: { entry: ActivityEntry; onClose: () =
 }
 
 // Feed sub-view
+const SOURCE_FILTERS = ['All', 'API', 'Agents', 'Claude', 'CI'] as const
+type SourceFilter = typeof SOURCE_FILTERS[number]
+
 function FeedView({ entries, loading, agentFilter, agents, onFilterChange, onRefresh, liveConnected }: {
   entries: ActivityEntry[]; loading: boolean; agentFilter: string; agents: string[];
   onFilterChange: (v: string) => void; onRefresh: () => void; liveConnected: boolean
 }) {
   const [modal, setModal] = useState<ActivityEntry | null>(null)
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('All')
   const statusColor = (s: string) => s === 'ok' || s === 'success' ? 'green' : s === 'error' || s === 'failed' ? 'red' : 'yellow'
-  const filtered = agentFilter === 'All' ? entries : entries.filter(e => e.agent === agentFilter)
+
+  const SOURCE_MAP: Record<SourceFilter, string | null> = {
+    All: null, API: 'backend', Agents: 'agent', Claude: 'claude', CI: 'ci',
+  }
+
+  const filtered = entries.filter(e => {
+    if (agentFilter !== 'All' && e.agent !== agentFilter) return false
+    const src = SOURCE_MAP[sourceFilter]
+    if (src && (e.event_type ?? 'agent') !== src) return false
+    return true
+  })
 
   return (
     <>
       {modal && <ActivityModal entry={modal} onClose={() => setModal(null)} />}
-      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap' as const }}>
-        <span style={{ ...S.badge(liveConnected ? 'green' : 'grey'), fontSize: '0.65rem' }}>
-          {liveConnected ? '● LIVE' : '○ offline'}
-        </span>
-        <select style={{ ...S.select, marginBottom: 0, fontSize: '0.72rem' }} value={agentFilter} onChange={e => onFilterChange(e.target.value)}>
-          {agents.map(a => <option key={a}>{a}</option>)}
-        </select>
-        <button onClick={onRefresh} style={{ marginLeft: 'auto', background: 'none', border: '1px solid #333', borderRadius: 3, color: '#555', fontSize: '0.62rem', padding: '0.1rem 0.4rem', cursor: 'pointer' }}>↻</button>
+      {/* Source filter pills */}
+      <div style={{ display: 'flex', gap: '0.3rem', marginBottom: '0.6rem', flexWrap: 'wrap' as const }}>
+        {SOURCE_FILTERS.map(f => {
+          const cfg = f === 'API' ? EVENT_TYPE_CONFIG.backend : f === 'Claude' ? EVENT_TYPE_CONFIG.claude : f === 'Agents' ? EVENT_TYPE_CONFIG.agent : f === 'CI' ? EVENT_TYPE_CONFIG.ci : null
+          const active = sourceFilter === f
+          return (
+            <button key={f} onClick={() => setSourceFilter(f)} style={{
+              background: active ? (cfg ? `${cfg.color}22` : '#1e3a5f') : 'none',
+              border: `1px solid ${active ? (cfg?.color ?? '#2563eb') : '#222'}`,
+              borderRadius: 3, color: active ? (cfg?.color ?? '#60a5fa') : '#444',
+              fontSize: '0.65rem', padding: '0.15rem 0.5rem', cursor: 'pointer', fontWeight: active ? 700 : 400,
+            }}>
+              {cfg && <span style={{ marginRight: '0.25rem', fontSize: '0.6rem', background: cfg.color, color: '#000', borderRadius: 2, padding: '0 3px' }}>{cfg.badge}</span>}
+              {f}
+            </button>
+          )
+        })}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+          <span style={{ ...S.badge(liveConnected ? 'green' : 'grey'), fontSize: '0.6rem' }}>
+            {liveConnected ? '● LIVE' : '○ offline'}
+          </span>
+          <select style={{ ...S.select, marginBottom: 0, fontSize: '0.68rem' }} value={agentFilter} onChange={e => onFilterChange(e.target.value)}>
+            {agents.map(a => <option key={a}>{a}</option>)}
+          </select>
+          <button onClick={onRefresh} style={{ background: 'none', border: '1px solid #333', borderRadius: 3, color: '#555', fontSize: '0.62rem', padding: '0.1rem 0.4rem', cursor: 'pointer' }}>↻</button>
+        </div>
       </div>
       {loading && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
       {!loading && filtered.length === 0 && <div style={{ color: '#444', fontSize: '0.8rem' }}>No activity yet.</div>}
       <div style={{ overflowY: 'auto' as const, flex: 1 }}>
-        {filtered.map((e, i) => (
-          <div key={i} onClick={() => setModal(e)}
-            style={{ display: 'flex', gap: '0.6rem', padding: '0.45rem 0.4rem', borderBottom: '1px solid #1a1a1a', alignItems: 'flex-start', cursor: 'pointer', borderRadius: 4, transition: 'background 0.1s' }}
-            onMouseEnter={el => (el.currentTarget.style.background = '#1a1a1a')}
-            onMouseLeave={el => (el.currentTarget.style.background = 'transparent')}>
-            <span style={S.badge(statusColor(e.status))}>{e.status}</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' as const }}>
-                <span style={{ fontSize: '0.72rem', color: agentColor(e.agent), fontWeight: 700 }}>{e.agent}</span>
-                <span style={{ fontSize: '0.75rem', color: '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, maxWidth: 400 }}>{e.action}</span>
+        {filtered.map((e, i) => {
+          const etCfg = eventTypeCfg(e)
+          return (
+            <div key={i} onClick={() => setModal(e)}
+              style={{ display: 'flex', gap: '0.5rem', padding: '0.4rem 0.35rem', borderBottom: '1px solid #1a1a1a', borderLeft: `3px solid ${etCfg.color}44`, alignItems: 'flex-start', cursor: 'pointer' }}
+              onMouseEnter={el => (el.currentTarget.style.background = '#1a1a1a')}
+              onMouseLeave={el => (el.currentTarget.style.background = 'transparent')}>
+              {/* source badge */}
+              <span style={{ fontSize: '0.55rem', fontWeight: 700, background: etCfg.color, color: '#000', borderRadius: 2, padding: '1px 4px', flexShrink: 0, alignSelf: 'center' }}>{etCfg.badge}</span>
+              <span style={{ ...S.badge(statusColor(e.status)), flexShrink: 0 }}>{e.status}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' as const }}>
+                  <span style={{ fontSize: '0.7rem', color: agentColor(e.agent), fontWeight: 700 }}>{e.agent}</span>
+                  <span style={{ fontSize: '0.73rem', color: e.event_type === 'backend' ? '#6ee7b7' : '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, maxWidth: 360 }}>{e.action}</span>
+                  {e.chain && <span style={{ fontSize: '0.6rem', color: '#2563eb', background: '#1e3a5f', borderRadius: 2, padding: '0 4px' }}>{e.chain}</span>}
+                </div>
+                {e.detail && <div style={{ ...S.mono, fontSize: '0.65rem', marginTop: '0.1rem', color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{e.detail}</div>}
+                <div style={{ ...S.mono, fontSize: '0.6rem', color: '#2a2a2a', marginTop: '0.1rem' }}>{new Date(e.ts).toLocaleString()}</div>
               </div>
-              {e.detail && <div style={{ ...S.mono, fontSize: '0.65rem', marginTop: '0.1rem', color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{e.detail}</div>}
-              <div style={{ ...S.mono, fontSize: '0.6rem', color: '#2a2a2a', marginTop: '0.1rem' }}>{new Date(e.ts).toLocaleString()}</div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </>
   )

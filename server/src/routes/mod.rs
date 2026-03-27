@@ -1,6 +1,8 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{chain::ChainAdapter, config::Config, db::Db, middleware::RateLimiter};
+use crate::{
+    activity::ActivityLogger, chain::ChainAdapter, config::Config, db::Db, middleware::RateLimiter,
+};
 use axum::{
     http::{header, HeaderName, HeaderValue, Method},
     routing::{get, post},
@@ -30,6 +32,9 @@ pub struct AppState {
     /// Multi-chain map: chain name (e.g. "base", "arbitrum") → adapter.
     /// The "base" entry is always present; others are optional.
     pub chains: Arc<HashMap<String, Arc<ChainAdapter>>>,
+    /// Activity logger — appends structured events to docs/agents/ACTIVITY.log
+    /// for the dashboard live feed. Fire-and-forget; never panics.
+    pub activity: Arc<ActivityLogger>,
 }
 
 impl AppState {
@@ -57,11 +62,14 @@ pub fn build(db: Db, config: Config) -> Router {
     // Build CORS from configured origins — #61
     let cors = build_cors(&config.server.cors_origins);
 
+    let activity = Arc::new(ActivityLogger::new(ActivityLogger::default_path()));
+
     let state = AppState {
         db,
         config,
         rate_limiter,
         chains,
+        activity,
     };
 
     let request_id_header = HeaderName::from_static("x-request-id");
