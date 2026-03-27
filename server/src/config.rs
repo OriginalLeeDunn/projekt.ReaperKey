@@ -42,6 +42,24 @@ pub struct AuthConfig {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChainsConfig {
     pub base: ChainConfig,
+    /// Arbitrum One (42161) — optional; enabled by setting ARBITRUM_* env vars.
+    pub arbitrum: Option<ChainConfig>,
+    /// Ethereum mainnet (1) — optional; enabled by setting ETHEREUM_* env vars.
+    pub ethereum: Option<ChainConfig>,
+}
+
+impl ChainsConfig {
+    /// Returns all configured chains as `(chain_name, config)` pairs.
+    pub fn all(&self) -> Vec<(&'static str, &ChainConfig)> {
+        let mut chains = vec![("base", &self.base)];
+        if let Some(ref a) = self.arbitrum {
+            chains.push(("arbitrum", a));
+        }
+        if let Some(ref e) = self.ethereum {
+            chains.push(("ethereum", e));
+        }
+        chains
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -84,6 +102,12 @@ impl Config {
                 "BASE_RPC_URL",
                 "BASE_BUNDLER_URL",
                 "BASE_PAYMASTER_URL",
+                "ARBITRUM_RPC_URL",
+                "ARBITRUM_BUNDLER_URL",
+                "ARBITRUM_PAYMASTER_URL",
+                "ETHEREUM_RPC_URL",
+                "ETHEREUM_BUNDLER_URL",
+                "ETHEREUM_PAYMASTER_URL",
             ]))
             .extract()?;
         Ok(config)
