@@ -32,7 +32,7 @@ impl DbSession {
 
 /// POST /session-key/issue
 /// The client generates the session key; only its hash is sent to the server.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct IssueSessionKeyRequest {
     pub account_id: Uuid,
     /// SHA-256 hash of the session key, computed client-side. Server never sees the key.
@@ -46,7 +46,7 @@ pub struct IssueSessionKeyRequest {
     pub ttl_seconds: u64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct SessionKeyResponse {
     pub session_id: Uuid,
     pub key_hash: String,

@@ -12,6 +12,7 @@ use tower_http::{
     set_header::SetResponseHeaderLayer,
     trace::TraceLayer,
 };
+use utoipa::OpenApi;
 
 use crate::{chain::ChainAdapter, config::Config, db::Db, middleware::RateLimiter};
 
@@ -47,6 +48,7 @@ pub fn build(db: Db, config: Config) -> Router {
     let request_id_header = HeaderName::from_static("x-request-id");
 
     Router::new()
+        .route("/api/openapi.json", get(openapi_json))
         .route("/health", get(health::check))
         .route("/auth/login", post(auth::login))
         .route("/auth/refresh", post(auth::refresh))
@@ -76,6 +78,10 @@ pub fn build(db: Db, config: Config) -> Router {
         .layer(PropagateRequestIdLayer::new(request_id_header.clone()))
         .layer(SetRequestIdLayer::new(request_id_header, MakeRequestUuid))
         .with_state(state)
+}
+
+pub async fn openapi_json() -> axum::Json<utoipa::openapi::OpenApi> {
+    axum::Json(crate::openapi::ApiDoc::openapi())
 }
 
 fn build_cors(origins: &[String]) -> CorsLayer {

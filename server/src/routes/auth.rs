@@ -14,6 +14,17 @@ use crate::{
 };
 
 /// POST /auth/login — SPEC-001, SPEC-002, SPEC-006, SPEC-007
+#[utoipa::path(
+    post,
+    path = "/auth/login",
+    tag = "auth",
+    request_body = crate::models::user::LoginRequest,
+    responses(
+        (status = 201, description = "New user registered", body = crate::models::user::AuthResponse),
+        (status = 200, description = "Existing user authenticated", body = crate::models::user::AuthResponse),
+        (status = 429, description = "Rate limited"),
+    )
+)]
 #[tracing::instrument(skip(state, headers, body), fields(method = ?body.method))]
 pub async fn login(
     State(state): State<AppState>,
@@ -80,6 +91,16 @@ pub async fn login(
 }
 
 /// POST /auth/refresh — SPEC-003, SPEC-004, SPEC-005
+#[utoipa::path(
+    post,
+    path = "/auth/refresh",
+    tag = "auth",
+    request_body = crate::models::user::RefreshRequest,
+    responses(
+        (status = 200, description = "Token refreshed", body = crate::models::user::AuthResponse),
+        (status = 401, description = "Invalid or expired token"),
+    )
+)]
 #[tracing::instrument(skip(state, body))]
 pub async fn refresh(
     State(state): State<AppState>,
