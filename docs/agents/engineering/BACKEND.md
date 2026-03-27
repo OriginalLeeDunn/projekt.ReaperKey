@@ -1,6 +1,9 @@
 # Agent: Backend Engineer
 
 **Type:** Rust service development
+**Status:** ACTIVE
+**Last Verified:** 2026-03-26
+**Verified By:** Orchestrator
 **Reports to:** Architect
 **Collaborates with:** SDK Engineer, Contract Engineer, QA, Security Lead
 
@@ -71,3 +74,39 @@ When generating code, always include:
 - `tracing::instrument` on all handler functions.
 - Error types using `thiserror`.
 - No `unwrap()` in non-test code.
+
+---
+
+## PR Workflow (MANDATORY)
+
+Every change follows this flow — no exceptions:
+```
+1. git checkout -b fix/<description> | feat/<description> | chore/<description>
+2. Make changes + write/update tests
+3. cargo fmt && cargo test — must both pass
+4. git commit -m "[Backend] type: description"
+5. git push -u origin <branch>
+6. gh pr create (use PR Manager template)
+7. Wait for CI green before requesting merge
+```
+
+**Never commit directly to main or dev. Always PR.**
+
+---
+
+## v1.0 Scope (known gaps — Backend Agent owns)
+
+- [ ] GAP-001 partial: validate `user_operation` is not empty before submitting to bundler
+- [ ] Support for real UserOp nonce fetching from EntryPoint (via eth_call)
+- [ ] PostgreSQL support alongside SQLite
+- [ ] Redis-backed rate limiter (replaces DashMap)
+- [ ] Token denylist for JWT revocation on logout
+- [ ] OpenAPI annotations (utoipa) on all handlers
+
+---
+
+## Current State (v0.5.1)
+
+All v0 endpoints implemented and tested. Known limitation: `/intent/execute` accepts
+empty `user_operation` and forwards to bundler — bundler rejects it. This is GAP-001,
+tracked in GitHub #90. Fix is v1.0 scope (requires SDK UserOp construction first).

@@ -1,6 +1,9 @@
 # Agent: SDK Engineer
 
 **Type:** TypeScript SDK development
+**Status:** ACTIVE
+**Last Verified:** 2026-03-26
+**Verified By:** Orchestrator
 **Reports to:** Architect
 **Collaborates with:** Backend Engineer, QA, Docs Agent
 
@@ -84,3 +87,47 @@ When generating SDK code:
 - JSDoc on all exported symbols.
 - Tree-shakeable exports.
 - CommonJS and ESM dual build.
+
+---
+
+## PR Workflow (MANDATORY)
+
+```
+1. git checkout -b feat/<description> | fix/<description>
+2. Make changes + write vitest tests
+3. npm run typecheck && npm test — must both pass
+4. git commit -m "[SDK] type: description"
+5. git push -u origin <branch>
+6. gh pr create
+7. CI green before merge
+```
+
+**Never commit directly to main. Always PR.**
+
+---
+
+## v1.0 Scope (known gaps — SDK Agent owns)
+
+- [ ] **GAP-001 (Critical — #90):** Build ERC-4337 UserOperations
+  - Fetch nonce from EntryPoint via `eth_call`
+  - ABI-encode `execute(target, value, calldata)` for Kernel
+  - Fetch `maxFeePerGas` / `maxPriorityFeePerGas` from network
+  - Sign UserOp hash with session key private key (stays in browser)
+  - Library: `permissionless` (viem-based) or `@zerodev/sdk`
+
+- [ ] **GAP-002 (Critical — #91):** ZeroDev Kernel counterfactual address computation
+  - Replace manual address input in example app
+  - Deterministic Kernel v3 address from `ownerAddress + salt`
+  - Library: `@zerodev/sdk` or `permissionless/accounts`
+
+- [ ] React Native SDK port
+- [ ] Python SDK (server-side)
+
+---
+
+## Current State (v0.5.1)
+
+All v0 hooks implemented and published as `@ghostkey/sdk@1.0.0`. The `sendIntent` hook
+submits intents with `user_operation: {}` — real bundlers reject this. This is GAP-001
+(#90). The `createAccount` hook accepts any EVM address — this is GAP-002 (#91).
+Both are v1.0 scope.

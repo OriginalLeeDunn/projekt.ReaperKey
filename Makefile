@@ -5,6 +5,10 @@
 dev: ## Start full local stack (server + hot reload)
 	cargo run --bin ghostkey-server -- --config config.toml
 
+.PHONY: dashboard
+dashboard: ## Start the Agent Dashboard (port 3002)
+	cd dashboard && npm install && npm run dev
+
 build: ## Build release binary
 	cargo build --release
 	@echo "Binary: target/release/ghostkey-server"
