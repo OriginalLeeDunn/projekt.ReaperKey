@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { marked } from 'marked'
 
 marked.setOptions({ breaks: true, gfm: true })
@@ -19,7 +19,7 @@ const S = {
   header: { background: '#111', borderBottom: '1px solid #222', padding: '0.75rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' } as React.CSSProperties,
   headerTitle: { fontSize: '0.95rem', fontWeight: 700, letterSpacing: '0.05em', color: '#fff' } as React.CSSProperties,
   headerSub: { fontSize: '0.7rem', color: '#555' } as React.CSSProperties,
-  tabBar: { background: '#0f0f0f', borderBottom: '1px solid #1e1e1e', display: 'flex', gap: 0, padding: '0 1.5rem' } as React.CSSProperties,
+  tabBar: { background: '#0f0f0f', borderBottom: '1px solid #1e1e1e', display: 'flex', gap: 0, padding: '0 1.5rem', overflowX: 'auto' as const } as React.CSSProperties,
   tab: (active: boolean) => ({
     padding: '0.65rem 1.1rem',
     fontSize: '0.75rem',
@@ -33,35 +33,43 @@ const S = {
     borderBottomColor: active ? '#2563eb' : 'transparent',
     letterSpacing: '0.04em',
     userSelect: 'none' as const,
+    whiteSpace: 'nowrap' as const,
   }),
-  body: { padding: '1rem 1.5rem', maxWidth: 1400, margin: '0 auto' } as React.CSSProperties,
+  body: { padding: '1rem 1.5rem', maxWidth: 1600, margin: '0 auto' } as React.CSSProperties,
   grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' } as React.CSSProperties,
   grid3: { display: 'grid', gridTemplateColumns: '320px 1fr 1fr', gap: '1rem' } as React.CSSProperties,
+  grid4: { display: 'grid', gridTemplateColumns: '260px 1fr 1fr 1fr', gap: '1rem' } as React.CSSProperties,
   col: { display: 'flex', flexDirection: 'column' as const, gap: '1rem' } as React.CSSProperties,
   card: { background: '#141414', border: '1px solid #222', borderRadius: 8, padding: '1rem' } as React.CSSProperties,
   cardTitle: { fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: '#555', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' } as React.CSSProperties,
   badge: (color: string) => ({
     display: 'inline-block', padding: '0.1rem 0.4rem', borderRadius: 3, fontSize: '0.62rem', fontWeight: 700,
-    background: color === 'green' ? '#14532d' : color === 'red' ? '#7f1d1d' : color === 'yellow' ? '#713f12' : color === 'blue' ? '#1e3a5f' : '#1c1c1c',
-    color: color === 'green' ? '#4ade80' : color === 'red' ? '#f87171' : color === 'yellow' ? '#fbbf24' : color === 'blue' ? '#60a5fa' : '#888',
-    border: `1px solid ${color === 'green' ? '#166534' : color === 'red' ? '#991b1b' : color === 'yellow' ? '#92400e' : color === 'blue' ? '#1d4ed8' : '#333'}`,
+    background: color === 'green' ? '#14532d' : color === 'red' ? '#7f1d1d' : color === 'yellow' ? '#713f12' : color === 'blue' ? '#1e3a5f' : color === 'purple' ? '#3b0764' : '#1c1c1c',
+    color: color === 'green' ? '#4ade80' : color === 'red' ? '#f87171' : color === 'yellow' ? '#fbbf24' : color === 'blue' ? '#60a5fa' : color === 'purple' ? '#c084fc' : '#888',
+    border: `1px solid ${color === 'green' ? '#166534' : color === 'red' ? '#991b1b' : color === 'yellow' ? '#92400e' : color === 'blue' ? '#1d4ed8' : color === 'purple' ? '#6b21a8' : '#333'}`,
   }) as React.CSSProperties,
   mono: { fontFamily: 'monospace', fontSize: '0.72rem', color: '#888', wordBreak: 'break-all' as const } as React.CSSProperties,
   pre: { fontFamily: 'monospace', fontSize: '0.72rem', color: '#aaa', background: '#0d0d0d', border: '1px solid #1e1e1e', borderRadius: 4, padding: '0.75rem', overflow: 'auto', maxHeight: 440, lineHeight: 1.5, whiteSpace: 'pre-wrap' as const, wordBreak: 'break-word' as const } as React.CSSProperties,
   input: { width: '100%', background: '#1e1e1e', border: '1px solid #333', borderRadius: 4, color: '#e0e0e0', padding: '0.5rem 0.75rem', fontSize: '0.8rem', boxSizing: 'border-box' as const, marginBottom: '0.5rem' } as React.CSSProperties,
   textarea: { width: '100%', background: '#1e1e1e', border: '1px solid #333', borderRadius: 4, color: '#e0e0e0', padding: '0.5rem 0.75rem', fontSize: '0.8rem', resize: 'vertical' as const, minHeight: 90, boxSizing: 'border-box' as const, marginBottom: '0.5rem' } as React.CSSProperties,
   select: { background: '#1e1e1e', border: '1px solid #333', borderRadius: 4, color: '#e0e0e0', padding: '0.5rem 0.75rem', fontSize: '0.8rem', marginBottom: '0.5rem' } as React.CSSProperties,
-  btn: (disabled?: boolean) => ({ background: disabled ? '#1a1a1a' : '#2563eb', border: '1px solid ' + (disabled ? '#222' : '#1d4ed8'), borderRadius: 4, color: disabled ? '#444' : '#fff', cursor: disabled ? 'not-allowed' : 'pointer', fontSize: '0.78rem', padding: '0.45rem 1rem', fontWeight: 600 }) as React.CSSProperties,
+  btn: (disabled?: boolean, variant?: 'danger' | 'ghost' | 'success') => ({
+    background: disabled ? '#1a1a1a' : variant === 'danger' ? '#7f1d1d' : variant === 'ghost' ? 'transparent' : variant === 'success' ? '#14532d' : '#2563eb',
+    border: `1px solid ${disabled ? '#222' : variant === 'danger' ? '#991b1b' : variant === 'ghost' ? '#333' : variant === 'success' ? '#166534' : '#1d4ed8'}`,
+    borderRadius: 4, color: disabled ? '#444' : '#fff', cursor: disabled ? 'not-allowed' : 'pointer',
+    fontSize: '0.78rem', padding: '0.45rem 1rem', fontWeight: 600,
+  }) as React.CSSProperties,
   row: { display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.4rem' } as React.CSSProperties,
   divider: { borderTop: '1px solid #1a1a1a', margin: '0.65rem 0' } as React.CSSProperties,
   sectionLabel: { fontSize: '0.62rem', fontWeight: 700, color: '#444', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '0.4rem' } as React.CSSProperties,
-  mdBody: { overflow: 'auto', maxHeight: 600, lineHeight: 1.65, fontSize: '0.82rem', color: '#ccc' } as React.CSSProperties,
   phaseRow: (done: boolean, active: boolean) => ({
     display: 'flex', gap: '0.6rem', alignItems: 'flex-start', padding: '0.5rem 0.6rem',
     borderRadius: 5, marginBottom: '0.3rem',
     background: active ? '#1a2a1a' : done ? '#111' : '#0f0f0f',
     border: `1px solid ${active ? '#166534' : done ? '#1e1e1e' : '#181818'}`,
   }) as React.CSSProperties,
+  tableCell: { padding: '0.35rem 0.6rem', fontSize: '0.72rem', fontFamily: 'monospace', borderBottom: '1px solid #1a1a1a', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const } as React.CSSProperties,
+  tableHead: { padding: '0.35rem 0.6rem', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.06em', color: '#555', borderBottom: '1px solid #2a2a2a', background: '#0f0f0f', whiteSpace: 'nowrap' as const } as React.CSSProperties,
 }
 
 // ── Health Panel ──────────────────────────────────────────────────────────────
@@ -129,12 +137,15 @@ function CIPanel() {
   const [runs, setRuns] = useState<WorkflowRun[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true)
     fetch('/api/github/runs')
       .then(r => r.json())
       .then(d => { setRuns(d.workflow_runs ? d.workflow_runs.slice(0, 10) : []); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
+
+  useEffect(() => { load() }, [load])
 
   const runColor = (run: WorkflowRun) => {
     if (run.status === 'in_progress' || run.status === 'queued') return 'yellow'
@@ -145,7 +156,10 @@ function CIPanel() {
 
   return (
     <div style={S.card}>
-      <div style={S.cardTitle}>CI / GitHub Actions</div>
+      <div style={S.cardTitle}>
+        CI / GitHub Actions
+        <button onClick={load} style={{ marginLeft: 'auto', background: 'none', border: '1px solid #333', borderRadius: 3, color: '#555', fontSize: '0.62rem', padding: '0.1rem 0.4rem', cursor: 'pointer' }}>↻</button>
+      </div>
       {loading && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
       {runs.map(run => (
         <div key={run.id} style={S.row}>
@@ -157,6 +171,49 @@ function CIPanel() {
         </div>
       ))}
       {!loading && runs.length === 0 && <div style={{ color: '#444', fontSize: '0.8rem' }}>No CI runs found</div>}
+    </div>
+  )
+}
+
+// ── PRs Panel ─────────────────────────────────────────────────────────────────
+interface GHPr { number: number; title: string; html_url: string; head: { ref: string }; base: { ref: string }; labels: { name: string }[]; created_at: string; draft: boolean }
+
+function PRPanel() {
+  const [prs, setPrs] = useState<GHPr[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(() => {
+    setLoading(true)
+    fetch('/api/github/prs')
+      .then(r => r.json())
+      .then(d => { setPrs(Array.isArray(d) ? d : []); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  return (
+    <div style={S.card}>
+      <div style={S.cardTitle}>
+        Open Pull Requests
+        <span style={S.badge(prs.length > 0 ? 'blue' : 'green')}>{prs.length}</span>
+        <button onClick={load} style={{ marginLeft: 'auto', background: 'none', border: '1px solid #333', borderRadius: 3, color: '#555', fontSize: '0.62rem', padding: '0.1rem 0.4rem', cursor: 'pointer' }}>↻</button>
+      </div>
+      {loading && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
+      {!loading && prs.length === 0 && <div style={{ color: '#4ade80', fontSize: '0.8rem' }}>No open PRs</div>}
+      {prs.map(pr => (
+        <div key={pr.number} style={{ marginBottom: '0.6rem', paddingBottom: '0.6rem', borderBottom: '1px solid #1a1a1a' }}>
+          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginBottom: '0.2rem' }}>
+            {pr.draft && <span style={S.badge('grey')}>draft</span>}
+            <a href={pr.html_url} target="_blank" rel="noreferrer" style={{ color: '#60a5fa', textDecoration: 'none', fontSize: '0.78rem' }}>
+              #{pr.number} {pr.title}
+            </a>
+          </div>
+          <div style={{ ...S.mono, fontSize: '0.65rem', color: '#444' }}>
+            {pr.head.ref} → {pr.base.ref}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -291,7 +348,6 @@ function PhasesPanel() {
       .then(r => r.json())
       .then(({ content }) => {
         if (!content) { setLoading(false); return }
-        // Parse Phase Checklist section
         const parsed: Phase[] = []
         const lines = content.split('\n')
         let inChecklist = false
@@ -301,27 +357,18 @@ function PhasesPanel() {
           if (line.includes('## Phase Checklist')) { inChecklist = true; continue }
           if (inChecklist && line.startsWith('##')) { inChecklist = false }
           if (!inChecklist) continue
-
-          // Phase header: "- [x] Phase N: ..." or "- [ ] Phase N: ..."
           const phaseMatch = line.match(/^- \[([ x])\] (Phase \d+[^:]*(?::.+)?)$/)
           if (phaseMatch) {
             if (current) parsed.push(current)
-            const done = phaseMatch[1] === 'x'
-            current = { name: phaseMatch[2], done, active: false, items: [] }
+            current = { name: phaseMatch[2], done: phaseMatch[1] === 'x', active: false, items: [] }
             continue
           }
-          // Sub-item: "  - [x] ..."
           const itemMatch = line.match(/^\s+- \[([ x])\] (.+)$/)
-          if (itemMatch && current) {
-            current.items.push({ text: itemMatch[2], done: itemMatch[1] === 'x' })
-          }
+          if (itemMatch && current) current.items.push({ text: itemMatch[2], done: itemMatch[1] === 'x' })
         }
         if (current) parsed.push(current)
-
-        // Mark the first incomplete phase as active
         const firstOpen = parsed.findIndex(p => !p.done)
         if (firstOpen !== -1) parsed[firstOpen].active = true
-
         setPhases(parsed)
         setLoading(false)
       })
@@ -341,7 +388,6 @@ function PhasesPanel() {
         <span style={{ ...S.mono, fontSize: '0.65rem', marginLeft: 'auto' }}>{doneItems}/{totalItems} items</span>
       </div>
       {loading && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
-      {/* Progress bar */}
       {!loading && phases.length > 0 && (
         <div style={{ marginBottom: '1rem' }}>
           <div style={{ height: 4, background: '#1a1a1a', borderRadius: 2, overflow: 'hidden' }}>
@@ -366,7 +412,7 @@ function PhasesPanel() {
                 </span>
               )}
             </div>
-            {expanded === phase.name && phase.items.length > 0 && (
+            {expanded === phase.name && (
               <div style={{ marginTop: '0.4rem' }}>
                 {phase.items.map((item, i) => (
                   <div key={i} style={{ ...S.mono, fontSize: '0.68rem', color: item.done ? '#4ade80' : '#555', marginBottom: '0.15rem' }}>
@@ -428,20 +474,19 @@ function MemoCenterPanel() {
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '1rem' }}>
-      {/* Compose */}
       <div style={S.card}>
         <div style={S.cardTitle}>Compose Memo</div>
-        <div style={{ ...S.sectionLabel, marginBottom: '0.3rem' }}>To</div>
-        <select style={{ ...S.select, width: '100%', marginBottom: '0.5rem' }} value={to} onChange={e => setTo(e.target.value)}>
+        <div style={S.sectionLabel}>To</div>
+        <select style={{ ...S.select, width: '100%' }} value={to} onChange={e => setTo(e.target.value)}>
           {AGENT_LIST.map(a => <option key={a}>{a}</option>)}
         </select>
-        <div style={{ ...S.sectionLabel, marginBottom: '0.3rem' }}>Priority</div>
-        <select style={{ ...S.select, width: '100%', marginBottom: '0.5rem' }} value={priority} onChange={e => setPriority(e.target.value)}>
+        <div style={S.sectionLabel}>Priority</div>
+        <select style={{ ...S.select, width: '100%' }} value={priority} onChange={e => setPriority(e.target.value)}>
           <option>LOW</option><option>MEDIUM</option><option>HIGH</option><option>CRITICAL</option>
         </select>
-        <div style={{ ...S.sectionLabel, marginBottom: '0.3rem' }}>Subject</div>
+        <div style={S.sectionLabel}>Subject</div>
         <input style={S.input} placeholder="Subject" value={subject} onChange={e => setSubject(e.target.value)} />
-        <div style={{ ...S.sectionLabel, marginBottom: '0.3rem' }}>Message</div>
+        <div style={S.sectionLabel}>Message</div>
         <textarea style={{ ...S.textarea, minHeight: 120 }} placeholder="Memo body..." value={body} onChange={e => setBody(e.target.value)} />
         <button style={S.btn(sendStatus === 'sending' || !subject || !body)} onClick={handleSend} disabled={sendStatus === 'sending' || !subject || !body}>
           {sendStatus === 'sending' ? 'Sending...' : sendStatus === 'sent' ? `Sent (${lastId})` : 'Send Memo'}
@@ -451,8 +496,6 @@ function MemoCenterPanel() {
           Memos append to docs/agents/INBOX.md.<br />Claude reads INBOX.md at session start.
         </div>
       </div>
-
-      {/* Inbox / Outbox viewer */}
       <div style={S.card}>
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', alignItems: 'center' }}>
           <button onClick={() => setActiveView('inbox')} style={S.tab(activeView === 'inbox')}>INBOX</button>
@@ -460,14 +503,8 @@ function MemoCenterPanel() {
           <button style={{ ...S.btn(), marginLeft: 'auto', padding: '0.3rem 0.7rem', fontSize: '0.7rem' }}
             onClick={() => { activeView === 'inbox' ? loadInbox() : loadOutbox() }}>Refresh</button>
         </div>
-        {activeView === 'inbox' && (
-          inboxLoading ? <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>
-            : <MarkdownView content={inbox} maxHeight={520} />
-        )}
-        {activeView === 'outbox' && (
-          outboxLoading ? <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>
-            : <MarkdownView content={outbox} maxHeight={520} />
-        )}
+        {activeView === 'inbox' && (inboxLoading ? <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div> : <MarkdownView content={inbox} maxHeight={520} />)}
+        {activeView === 'outbox' && (outboxLoading ? <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div> : <MarkdownView content={outbox} maxHeight={520} />)}
       </div>
     </div>
   )
@@ -483,29 +520,26 @@ function DecisionsPanel() {
     fetch('/api/decisions').then(r => r.json()).then(d => { setContent(d.content); setLoading(false) }).catch(() => setLoading(false))
   }, [])
 
-  // Extract decision entries (### DEC-NNN sections)
   const entries = content.split(/(?=^### DEC-)/m).filter(s => s.startsWith('### DEC-'))
   const filtered = filter ? entries.filter(e => e.toLowerCase().includes(filter.toLowerCase())) : entries
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
-      <div style={S.card}>
-        <div style={S.cardTitle}>Decision Log <span style={S.badge('blue')}>{entries.length} decisions</span></div>
-        <input style={{ ...S.input, marginBottom: '0.75rem' }} placeholder="Filter decisions..." value={filter} onChange={e => setFilter(e.target.value)} />
-        {loading && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
-        {!loading && filtered.length === 0 && <div style={{ color: '#444', fontSize: '0.8rem' }}>No decisions found.</div>}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: 600, overflow: 'auto' }}>
-          {[...filtered].reverse().map((entry, i) => {
-            const titleLine = entry.split('\n')[0].replace('### ', '')
-            const rest = entry.split('\n').slice(1).join('\n').trim()
-            return (
-              <div key={i} style={{ background: '#0f0f0f', border: '1px solid #1e1e1e', borderRadius: 6, padding: '0.6rem 0.75rem' }}>
-                <div style={{ fontSize: '0.78rem', color: '#93c5fd', fontWeight: 600, marginBottom: '0.3rem' }}>{titleLine}</div>
-                <MarkdownView content={rest} maxHeight={180} />
-              </div>
-            )
-          })}
-        </div>
+    <div style={S.card}>
+      <div style={S.cardTitle}>Decision Log <span style={S.badge('blue')}>{entries.length} decisions</span></div>
+      <input style={{ ...S.input, marginBottom: '0.75rem' }} placeholder="Filter decisions..." value={filter} onChange={e => setFilter(e.target.value)} />
+      {loading && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
+      {!loading && filtered.length === 0 && <div style={{ color: '#444', fontSize: '0.8rem' }}>No decisions found.</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: 600, overflow: 'auto' }}>
+        {[...filtered].reverse().map((entry, i) => {
+          const titleLine = entry.split('\n')[0].replace('### ', '')
+          const rest = entry.split('\n').slice(1).join('\n').trim()
+          return (
+            <div key={i} style={{ background: '#0f0f0f', border: '1px solid #1e1e1e', borderRadius: 6, padding: '0.6rem 0.75rem' }}>
+              <div style={{ fontSize: '0.78rem', color: '#93c5fd', fontWeight: 600, marginBottom: '0.3rem' }}>{titleLine}</div>
+              <MarkdownView content={rest} maxHeight={180} />
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -523,17 +557,365 @@ function DeploymentsPanel() {
   return (
     <div style={S.card}>
       <div style={S.cardTitle}>Deployment History</div>
-      {loading ? <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>
-        : <MarkdownView content={content} maxHeight={600} />}
+      {loading ? <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div> : <MarkdownView content={content} maxHeight={600} />}
+    </div>
+  )
+}
+
+// ── Database Panel ────────────────────────────────────────────────────────────
+interface DbTable { name: string; rows: number | null }
+interface DbTableData { rows: Record<string, unknown>[]; columns: string[]; total: number; page: number; limit: number; error?: string }
+
+function DatabasePanel() {
+  const [dbStatus, setDbStatus] = useState<{ available: boolean; reason?: string } | null>(null)
+  const [tables, setTables] = useState<DbTable[]>([])
+  const [selectedTable, setSelectedTable] = useState<string | null>(null)
+  const [tableData, setTableData] = useState<DbTableData | null>(null)
+  const [tableLoading, setTableLoading] = useState(false)
+  const [page, setPage] = useState(0)
+  const [queryMode, setQueryMode] = useState(false)
+  const [sql, setSql] = useState('SELECT * FROM users LIMIT 20')
+  const [queryResult, setQueryResult] = useState<{ rows: Record<string, unknown>[]; columns: string[]; error?: string } | null>(null)
+  const [queryLoading, setQueryLoading] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/db/status').then(r => r.json()).then(s => {
+      setDbStatus(s)
+      if (s.available) {
+        fetch('/api/db/tables').then(r => r.json()).then(setTables).catch(() => {})
+      }
+    }).catch(() => setDbStatus({ available: false, reason: 'API server not running' }))
+  }, [])
+
+  const loadTable = useCallback((name: string, p = 0) => {
+    setTableLoading(true)
+    setQueryMode(false)
+    fetch(`/api/db/table/${name}?page=${p}`)
+      .then(r => r.json())
+      .then(d => { setTableData(d); setTableLoading(false) })
+      .catch(() => setTableLoading(false))
+  }, [])
+
+  function selectTable(name: string) {
+    setSelectedTable(name)
+    setPage(0)
+    loadTable(name, 0)
+  }
+
+  async function runQuery() {
+    setQueryLoading(true)
+    setQueryMode(true)
+    try {
+      const r = await fetch('/api/db/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sql }) })
+      const d = await r.json()
+      setQueryResult(d)
+    } catch { setQueryResult({ rows: [], columns: [], error: 'Request failed' }) }
+    setQueryLoading(false)
+  }
+
+  const displayData = queryMode ? queryResult : tableData
+  const totalPages = tableData && !queryMode ? Math.ceil(tableData.total / tableData.limit) : 0
+
+  if (!dbStatus) return <div style={S.card}><div style={{ color: '#444', fontSize: '0.8rem' }}>Connecting to database...</div></div>
+  if (!dbStatus.available) return (
+    <div style={S.card}>
+      <div style={S.cardTitle}>Database <span style={S.badge('red')}>unavailable</span></div>
+      <div style={{ color: '#f87171', fontSize: '0.8rem' }}>{dbStatus.reason}</div>
+      <div style={{ ...S.mono, marginTop: '0.5rem', fontSize: '0.68rem', color: '#444' }}>Start the server with <code>make dev</code> to create db/ghostkey.db</div>
+    </div>
+  )
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '1rem' }}>
+      {/* Table list */}
+      <div style={S.card}>
+        <div style={S.cardTitle}>Tables <span style={S.badge('blue')}>{tables.length}</span></div>
+        {tables.map(t => (
+          <button key={t.name} onClick={() => selectTable(t.name)}
+            style={{ display: 'block', width: '100%', textAlign: 'left' as const, background: selectedTable === t.name && !queryMode ? '#1a2030' : 'none', border: `1px solid ${selectedTable === t.name && !queryMode ? '#1d4ed8' : 'transparent'}`, borderRadius: 4, padding: '0.25rem 0.5rem', marginBottom: '0.15rem', cursor: 'pointer' }}>
+            <div style={{ fontSize: '0.75rem', color: selectedTable === t.name && !queryMode ? '#93c5fd' : '#aaa' }}>{t.name}</div>
+            <div style={{ fontSize: '0.62rem', color: '#444' }}>{t.rows?.toLocaleString() ?? '?'} rows</div>
+          </button>
+        ))}
+        <div style={S.divider} />
+        <button onClick={() => { setQueryMode(true); setSelectedTable(null) }}
+          style={{ ...S.btn(false, queryMode ? 'success' : undefined), width: '100%', marginTop: '0.25rem', fontSize: '0.72rem' }}>
+          SQL Query
+        </button>
+      </div>
+
+      {/* Table viewer / Query box */}
+      <div style={S.card}>
+        {!queryMode && !selectedTable && (
+          <div style={{ color: '#555', fontSize: '0.82rem', paddingTop: '0.5rem' }}>Select a table or run a custom SQL query.</div>
+        )}
+
+        {/* SQL Query mode */}
+        {queryMode && (
+          <>
+            <div style={S.cardTitle}>SQL Query <span style={S.badge('yellow')}>SELECT only</span></div>
+            <textarea
+              style={{ ...S.textarea, minHeight: 80, fontFamily: 'monospace', fontSize: '0.78rem' }}
+              value={sql}
+              onChange={e => setSql(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) runQuery() }}
+              placeholder="SELECT * FROM users LIMIT 10"
+            />
+            <button style={{ ...S.btn(queryLoading), marginBottom: '0.75rem' }} onClick={runQuery} disabled={queryLoading}>
+              {queryLoading ? 'Running...' : 'Run Query (Ctrl+Enter)'}
+            </button>
+          </>
+        )}
+
+        {/* Table header */}
+        {!queryMode && selectedTable && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+            <div style={S.cardTitle}>{selectedTable}</div>
+            <span style={{ ...S.mono, fontSize: '0.65rem', color: '#555' }}>{tableData?.total?.toLocaleString()} rows</span>
+            <button onClick={() => loadTable(selectedTable, page)}
+              style={{ marginLeft: 'auto', background: 'none', border: '1px solid #333', borderRadius: 3, color: '#555', fontSize: '0.62rem', padding: '0.1rem 0.4rem', cursor: 'pointer' }}>↻</button>
+          </div>
+        )}
+
+        {/* Data table */}
+        {(tableLoading || queryLoading) && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
+        {displayData?.error && <div style={{ color: '#f87171', fontSize: '0.8rem', marginBottom: '0.5rem' }}>{displayData.error}</div>}
+        {displayData && !tableLoading && !queryLoading && displayData.columns.length > 0 && (
+          <div style={{ overflowX: 'auto' as const }}>
+            <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+              <thead>
+                <tr>
+                  {displayData.columns.map(col => (
+                    <th key={col} style={S.tableHead}>{col}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {displayData.rows.map((row, i) => (
+                  <tr key={i} style={{ background: i % 2 === 0 ? '#111' : '#141414' }}>
+                    {displayData.columns.map(col => (
+                      <td key={col} style={{ ...S.tableCell, color: row[col] === null ? '#444' : '#ccc' }}
+                        title={String(row[col] ?? 'NULL')}>
+                        {row[col] === null ? 'NULL' : String(row[col])}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {displayData && displayData.rows.length === 0 && !tableLoading && !queryLoading && (
+          <div style={{ color: '#444', fontSize: '0.8rem', marginTop: '0.5rem' }}>No rows</div>
+        )}
+
+        {/* Pagination */}
+        {!queryMode && tableData && totalPages > 1 && (
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', alignItems: 'center' }}>
+            <button style={S.btn(page === 0)} disabled={page === 0}
+              onClick={() => { const p = page - 1; setPage(p); loadTable(selectedTable!, p) }}>← Prev</button>
+            <span style={{ ...S.mono, fontSize: '0.68rem' }}>Page {page + 1} / {totalPages}</span>
+            <button style={S.btn(page >= totalPages - 1)} disabled={page >= totalPages - 1}
+              onClick={() => { const p = page + 1; setPage(p); loadTable(selectedTable!, p) }}>Next →</button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Governance Panel ──────────────────────────────────────────────────────────
+function GovernancePanel() {
+  const [content, setContent] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState('')
+
+  useEffect(() => {
+    fetch('/api/governance').then(r => r.json()).then(d => { setContent(d.content); setLoading(false) }).catch(() => setLoading(false))
+  }, [])
+
+  const sections = content.split(/(?=^## )/m).filter(s => s.trim())
+  const filtered = filter ? sections.filter(s => s.toLowerCase().includes(filter.toLowerCase())) : sections
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+      <div style={S.card}>
+        <div style={S.cardTitle}>
+          Governance Rules
+          <span style={S.badge('purple')}>ACTIVE</span>
+        </div>
+        <input style={{ ...S.input, marginBottom: '0.75rem' }} placeholder="Filter..." value={filter} onChange={e => setFilter(e.target.value)} />
+        {loading && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
+        <div style={{ maxHeight: 600, overflow: 'auto' }}>
+          {filtered.map((section, i) => {
+            const title = section.split('\n')[0].replace(/^#+\s*/, '')
+            const body = section.split('\n').slice(1).join('\n').trim()
+            return (
+              <div key={i} style={{ marginBottom: '1rem', padding: '0.6rem 0.75rem', background: '#0f0f0f', border: '1px solid #1e1e1e', borderRadius: 6 }}>
+                <div style={{ fontSize: '0.8rem', color: '#c084fc', fontWeight: 600, marginBottom: '0.4rem' }}>{title}</div>
+                <MarkdownView content={body} maxHeight={200} />
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* CI discipline checklist */}
+      <div style={S.col}>
+        <div style={S.card}>
+          <div style={S.cardTitle}>CI Gate Checklist</div>
+          {[
+            { label: 'feat branch CI green before PR', rule: true },
+            { label: 'PR CI green before merge to dev', rule: true },
+            { label: 'dev CI green before PR to main', rule: true },
+            { label: 'user confirmation before main merge', rule: true },
+            { label: 'one branch at a time through full cycle', rule: true },
+          ].map((item, i) => (
+            <div key={i} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.35rem' }}>
+              <span style={S.badge('green')}>✓</span>
+              <span style={{ fontSize: '0.78rem', color: '#aaa' }}>{item.label}</span>
+            </div>
+          ))}
+        </div>
+        <div style={S.card}>
+          <div style={S.cardTitle}>Branch Strategy</div>
+          {[
+            { branch: 'feat/*', desc: 'Feature work — CI required before PR' },
+            { branch: 'fix/*', desc: 'Bug fixes — CI required before PR' },
+            { branch: 'docs/*', desc: 'Docs only — CI required before PR' },
+            { branch: 'ops/*', desc: 'Infra/config — CI required before PR' },
+            { branch: 'dev', desc: 'Integration branch — always green' },
+            { branch: 'main', desc: 'Production — only from green dev, user confirmed' },
+          ].map((b, i) => (
+            <div key={i} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.3rem' }}>
+              <code style={{ ...S.mono, color: '#60a5fa', background: '#1e3a5f', padding: '0.1rem 0.35rem', borderRadius: 3, fontSize: '0.68rem' }}>{b.branch}</code>
+              <span style={{ fontSize: '0.75rem', color: '#666' }}>{b.desc}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Activity Log Panel ────────────────────────────────────────────────────────
+interface ActivityEntry { ts: string; agent: string; action: string; detail: string; status: string }
+
+function ActivityPanel() {
+  const [entries, setEntries] = useState<ActivityEntry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [agentFilter, setAgentFilter] = useState('All')
+  const [logAgent, setLogAgent] = useState('Founder')
+  const [logAction, setLogAction] = useState('')
+  const [logDetail, setLogDetail] = useState('')
+  const [logStatus, setLogStatus] = useState('ok')
+  const [posting, setPosting] = useState(false)
+  const [liveConnected, setLiveConnected] = useState(false)
+
+  const load = useCallback(() => {
+    setLoading(true)
+    fetch('/api/activity').then(r => r.json()).then(d => { setEntries(Array.isArray(d) ? d : []); setLoading(false) }).catch(() => setLoading(false))
+  }, [])
+
+  // Initial load + SSE live stream
+  useEffect(() => {
+    load()
+    const es = new EventSource('/api/stream/activity')
+    es.onopen = () => setLiveConnected(true)
+    es.onerror = () => setLiveConnected(false)
+    es.onmessage = (e) => {
+      try {
+        const entry: ActivityEntry = JSON.parse(e.data)
+        setEntries(prev => [entry, ...prev].slice(0, 200))
+      } catch { /* ignore */ }
+    }
+    return () => es.close()
+  }, [load])
+
+  const agents = ['All', ...Array.from(new Set(entries.map(e => e.agent)))]
+  const filtered = agentFilter === 'All' ? entries : entries.filter(e => e.agent === agentFilter)
+
+  async function postEntry() {
+    if (!logAction) return
+    setPosting(true)
+    await fetch('/api/activity', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent: logAgent, action: logAction, detail: logDetail, status: logStatus }) })
+    setLogAction(''); setLogDetail('')
+    await load()
+    setPosting(false)
+  }
+
+  const statusColor = (s: string) => s === 'ok' || s === 'success' ? 'green' : s === 'error' || s === 'failed' ? 'red' : 'yellow'
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '1rem' }}>
+      {/* Log entry composer */}
+      <div style={S.card}>
+        <div style={S.cardTitle}>Log Activity</div>
+        <div style={S.sectionLabel}>Agent</div>
+        <select style={{ ...S.select, width: '100%' }} value={logAgent} onChange={e => setLogAgent(e.target.value)}>
+          {['Founder', ...AGENT_LIST].map(a => <option key={a}>{a}</option>)}
+        </select>
+        <div style={S.sectionLabel}>Action</div>
+        <input style={S.input} placeholder="e.g. merged PR #115 to dev" value={logAction} onChange={e => setLogAction(e.target.value)} />
+        <div style={S.sectionLabel}>Detail</div>
+        <input style={S.input} placeholder="optional detail" value={logDetail} onChange={e => setLogDetail(e.target.value)} />
+        <div style={S.sectionLabel}>Status</div>
+        <select style={{ ...S.select, width: '100%' }} value={logStatus} onChange={e => setLogStatus(e.target.value)}>
+          <option value="ok">ok</option>
+          <option value="success">success</option>
+          <option value="warning">warning</option>
+          <option value="error">error</option>
+          <option value="failed">failed</option>
+        </select>
+        <button style={S.btn(posting || !logAction)} onClick={postEntry} disabled={posting || !logAction}>
+          {posting ? 'Logging...' : 'Log Entry'}
+        </button>
+      </div>
+
+      {/* Activity feed */}
+      <div style={S.card}>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap' as const }}>
+          <div style={S.cardTitle}>
+            Activity Feed
+            <span style={{ ...S.badge(liveConnected ? 'green' : 'grey'), display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+              {liveConnected ? '● LIVE' : '○ offline'}
+            </span>
+          </div>
+          <select style={{ ...S.select, marginBottom: 0, fontSize: '0.72rem' }} value={agentFilter} onChange={e => setAgentFilter(e.target.value)}>
+            {agents.map(a => <option key={a}>{a}</option>)}
+          </select>
+          <button onClick={load} style={{ marginLeft: 'auto', background: 'none', border: '1px solid #333', borderRadius: 3, color: '#555', fontSize: '0.62rem', padding: '0.1rem 0.4rem', cursor: 'pointer' }}>↻</button>
+        </div>
+        {loading && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
+        {!loading && filtered.length === 0 && <div style={{ color: '#444', fontSize: '0.8rem' }}>No activity logged yet.</div>}
+        <div style={{ maxHeight: 560, overflowY: 'auto' as const }}>
+          {filtered.map((e, i) => (
+            <div key={i} style={{ display: 'flex', gap: '0.6rem', padding: '0.4rem 0', borderBottom: '1px solid #1a1a1a', alignItems: 'flex-start' }}>
+              <span style={S.badge(statusColor(e.status))}>{e.status}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' as const }}>
+                  <span style={{ fontSize: '0.72rem', color: '#93c5fd', fontWeight: 600 }}>{e.agent}</span>
+                  <span style={{ fontSize: '0.75rem', color: '#ccc' }}>{e.action}</span>
+                </div>
+                {e.detail && <div style={{ ...S.mono, fontSize: '0.68rem', marginTop: '0.1rem', color: '#555' }}>{e.detail}</div>}
+                <div style={{ ...S.mono, fontSize: '0.62rem', color: '#333', marginTop: '0.1rem' }}>{new Date(e.ts).toLocaleString()}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
 
 // ── Tab definitions ───────────────────────────────────────────────────────────
-type TabId = 'overview' | 'phases' | 'agents' | 'memos' | 'decisions' | 'deployments'
+type TabId = 'overview' | 'database' | 'phases' | 'agents' | 'governance' | 'activity' | 'memos' | 'decisions' | 'deployments'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
+  { id: 'database', label: 'Database' },
+  { id: 'governance', label: 'Governance' },
+  { id: 'activity', label: 'Activity' },
   { id: 'phases', label: 'Phases' },
   { id: 'agents', label: 'Agents' },
   { id: 'memos', label: 'Memo Center' },
@@ -541,19 +923,26 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'deployments', label: 'Deployments' },
 ]
 
+// ── Clock ─────────────────────────────────────────────────────────────────────
+function Clock() {
+  const [now, setNow] = useState(new Date())
+  const ref = useRef<ReturnType<typeof setInterval> | null>(null)
+  useEffect(() => { ref.current = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(ref.current!) }, [])
+  return <span>{now.toLocaleString()}</span>
+}
+
 // ── Main App ──────────────────────────────────────────────────────────────────
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>('overview')
-  const now = new Date().toLocaleString()
 
   return (
     <div style={S.page}>
       <div style={S.header}>
         <div>
-          <div style={S.headerTitle}>GhostKey — Agent Dashboard</div>
-          <div style={S.headerSub}>Agent Bus · Memo Center · System Health · Phase Tracker</div>
+          <div style={S.headerTitle}>GhostKey — Agent Operations Dashboard</div>
+          <div style={S.headerSub}>DB Viewer · Governance · Activity · Memo Center · CI · Phase Tracker</div>
         </div>
-        <div style={{ fontSize: '0.68rem', color: '#333' }}>{now}</div>
+        <div style={{ fontSize: '0.68rem', color: '#333' }}><Clock /></div>
       </div>
 
       <div style={S.tabBar}>
@@ -566,16 +955,21 @@ export default function App() {
 
       <div style={S.body}>
         {activeTab === 'overview' && (
-          <div style={S.grid3}>
-            <div style={S.col}>
+          <div style={S.col}>
+            <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr 1fr', gap: '1rem' }}>
               <HealthPanel />
               <CIPanel />
+              <PRPanel />
             </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <IssuesPanel />
-            </div>
+            <IssuesPanel />
           </div>
         )}
+
+        {activeTab === 'database' && <DatabasePanel />}
+
+        {activeTab === 'governance' && <GovernancePanel />}
+
+        {activeTab === 'activity' && <ActivityPanel />}
 
         {activeTab === 'phases' && <PhasesPanel />}
 
