@@ -137,6 +137,8 @@ function appendActivity(fields) {
     ...(fields.meta && { meta: fields.meta }),
   }
   appendFileSync(ACTIVITY_LOG, JSON.stringify(entry) + '\n')
+  lastLogSize += Buffer.byteLength(JSON.stringify(entry) + '\n')
+  broadcast(entry)
   return entry
 }
 
@@ -259,12 +261,14 @@ function broadcast(entry) {
   }
 }
 
+// Ensure ACTIVITY.log exists so watchers and GET /api/activity always work
+if (!existsSync(ACTIVITY_LOG)) {
+  appendFileSync(ACTIVITY_LOG, '')
+}
+
 // Watch ACTIVITY.log for new appended lines and broadcast to all SSE clients.
 // Backend (Rust) and Claude tool hooks write here directly; this picks them up.
-let lastLogSize = 0
-if (existsSync(ACTIVITY_LOG)) {
-  lastLogSize = readFileSync(ACTIVITY_LOG).length
-}
+let lastLogSize = readFileSync(ACTIVITY_LOG).length
 
 function broadcastNewEntries() {
   if (!existsSync(ACTIVITY_LOG)) return
@@ -362,8 +366,6 @@ watch(join(REPO_ROOT, 'docs/agents'), { persistent: false }, (event, filename) =
 
 // Watch docs/agents/ACTIVITY.log directly to also catch Rust backend writes
 // (which go directly to the file, bypassing the directory watcher sometimes)
-if (existsSync(ACTIVITY_LOG)) {
-  watch(ACTIVITY_LOG, { persistent: false }, () => broadcastNewEntries())
-}
+watch(ACTIVITY_LOG, { persistent: false }, () => broadcastNewEntries())
 
 app.listen(3003, () => console.log('Dashboard API server running on :3003'))
