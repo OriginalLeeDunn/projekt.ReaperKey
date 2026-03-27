@@ -190,7 +190,7 @@ Governor runs continuously → monitors all of the above for drift and staleness
 9. **Living docs.** Every governance doc carries a `Last Verified` date. If stale, re-verify before using.
 10. **Format before commit.** Run `cargo fmt` on ALL Rust changes before every commit. Never commit unformatted code. CI enforces `cargo fmt --check` — a format failure wastes an entire CI run. The pre-commit hook at `.githooks/pre-commit` enforces this locally. Activate it with `git config core.hooksPath .githooks`.
 11. **GitHub Issues are the single source of truth for open problems.** Every CI failure, security finding, or drift is a GitHub Issue first. HEALTH.md and DEPLOYMENTS.md reference issue numbers — they do not replace issues.
-12. **No direct commits to main. Ever.** All changes — code, docs, config, ops — go through a branch and PR. CI must be green before merge. Force-pushing main to remove an unauthorized commit is acceptable recovery, but the violation must be noted in the PR that replaces it.
+12. **Branch discipline: feat → dev → main. No exceptions.** All work happens on a `feat/fix/hotfix/docs/chore/ops` branch cut from `dev`. PR to `dev` first — CI must be green. Only `dev` opens PRs to `main`. CI must be green on `dev → main` too, and a human observes and confirms before merge. Hotfixes go through `dev`. Direct commits to `main` or `dev` are prohibited. Force-pushing main to recover from a violation is acceptable, but the violation must be logged in GOVERNANCE.md Rule #12 violation record.
 
 ---
 
