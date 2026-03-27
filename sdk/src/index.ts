@@ -32,3 +32,10 @@ export type {
 } from './types.js'
 export { buildUserOperation, getUserOpHash, ENTRY_POINT_V06, CHAIN_CONFIGS } from './userop.js'
 export type { UserOperation, BuildUserOpParams } from './userop.js'
+export {
+  buildSessionKeyRegistrationUserOp,
+  deriveSessionKeyAddress,
+  KERNEL_ECDSA_VALIDATOR,
+  KERNEL_EXECUTE_SELECTOR,
+} from './session-registration.js'
+export type { RegisterSessionKeyParams } from './session-registration.js'

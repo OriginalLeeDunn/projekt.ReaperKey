@@ -67,6 +67,7 @@ export interface SessionKeyRequest {
 export interface SessionKeyResponse {
   sessionId: string
   keyHash: string
+  sessionKeyAddress: string | null  // GAP-003: on-chain EOA address, null if not yet registered
   expiresAt: string
 }
 
