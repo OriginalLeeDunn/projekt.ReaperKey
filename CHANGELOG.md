@@ -15,6 +15,36 @@ _Nothing unreleased yet._
 
 ---
 
+## [1.0.0] — 2026-03-26 — Phase 6: v1.0 Production Ready
+
+### Breaking Changes
+- SQLite database path moved from `./ghostkey.db` to `./db/ghostkey.db`. Update any `config.toml` or env var overrides.
+
+### Added
+- **POST `/auth/logout`** — Invalidates the caller's JWT via SHA-256 denylist in `token_denylist` table. Denylisted tokens are rejected on every subsequent authenticated request.
+- **Multi-chain dispatch** — `ChainsConfig` now supports optional `arbitrum` and `ethereum` fields. Intent route reads `account.chain` from DB and routes to the correct `ChainAdapter`. Falls back to `base` if chain not configured.
+- **PostgreSQL support** — `AnyPool` replaces `SqlitePool`; set `database.url` to a `postgresql://` URL to use Postgres. `migrations_pg/` contains Postgres-compatible migrations.
+- **`db/` directory** — SQLite database now lives at `./db/ghostkey.db`. `db/.gitkeep` tracks the directory; `.db` files are gitignored.
+- **`sendIntentWithSessionKey`** (GAP-001) — New `useSendIntent` method that auto-builds and signs a full ERC-4337 UserOperation client-side via `buildUserOperation()` before submitting. Old `sendIntent` retained for callers that pre-build their own UserOp.
+- **`GET /api/openapi.json`** — OpenAPI spec endpoint (utoipa).
+
+### Changed
+- `default_db_url()` → `"sqlite:./db/ghostkey.db"` (was `"sqlite:./ghostkey.db"`)
+- `config.toml.example` updated to reflect new db path and added multi-chain config examples
+- `Makefile` `migrate-dry` target updated to `sqlite:./db/ghostkey.db`
+- Release workflow npm publish now idempotent — `|| echo "Version already published"` prevents E403 failure on re-run
+- `AppState.chains` changed from `Arc<ChainAdapter>` to `Arc<HashMap<String, Arc<ChainAdapter>>>` for multi-chain routing
+
+### Security
+- JWT denylist: logout invalidates tokens immediately; hash stored in `token_denylist` table
+- AnyPool in-memory SQLite tests use `max_connections(1)` to prevent per-connection DB split-brain
+
+### Release
+- GitHub Release `v1.0.0` — binary artifacts for x86_64/aarch64 Linux + macOS
+- npm `@ghostkey/sdk@1.0.0` published to public registry
+
+---
+
 ## [0.5.0] — 2026-03-26 — Phase 5: Open Source Launch
 
 ### Tests
@@ -208,3 +238,4 @@ log_format = "pretty"   # or "json"
 
 <!-- Links -->
 [Unreleased]: https://github.com/OriginalLeeDunn/projekt.ReaperKey/compare/main...dev
+[1.0.0]: https://github.com/OriginalLeeDunn/projekt.ReaperKey/releases/tag/v1.0.0

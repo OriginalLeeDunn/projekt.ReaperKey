@@ -13,8 +13,12 @@ Get from zero to a working smart account with session keys in under 5 minutes.
 ## 1. Install the SDK
 
 ```bash
-npm install @ghostkey/sdk
+npm install @ghostkey/sdk@1.0.0
 ```
+
+The v1.0.0 package is published to npm as `@ghostkey/sdk@1.0.0`. A pre-built server binary is also available on the [GitHub releases page](https://github.com/ghostkey/ghostkey/releases/tag/v1.0.0).
+
+**Server database path:** As of v1.0.0 the SQLite database is created at `./db/ghostkey.db` (previously `./ghostkey.db`). Ensure the `db/` directory exists or is writable when self-hosting. To use PostgreSQL instead, set `DATABASE_URL=postgresql://...` (or `GHOSTKEY__DATABASE__URL=postgresql://...`).
 
 ---
 
@@ -122,14 +126,16 @@ export function IssueKey({ accountId }: { accountId: string }) {
 
 ## 6. Send an intent
 
+Use `sendIntentWithSessionKey` (v1.0.0+) to let the SDK build the UserOperation automatically (GAP-001). The older `sendIntent` is still available for cases where you construct the UserOperation manually.
+
 ```tsx
 import { useSendIntent } from '@ghostkey/sdk'
 
 export function SendTransfer({ sessionId }: { sessionId: string }) {
-  const { sendIntent, status, txHash, error } = useSendIntent()
+  const { sendIntentWithSessionKey, status, txHash, error } = useSendIntent()
 
   async function handleSend() {
-    await sendIntent(sessionId, {
+    await sendIntentWithSessionKey(sessionId, {
       target: '0xTokenContractAddress',
       calldata: '0xa9059cbb...', // encoded ERC-20 transfer
       value: '0',
@@ -162,7 +168,7 @@ export function Demo() {
   const { login, status: authStatus } = useLogin()
   const { createAccount, account } = useAccount()
   const { issueSessionKey, sessionKey } = useSessionKey()
-  const { sendIntent, txHash } = useSendIntent()
+  const { sendIntentWithSessionKey, txHash } = useSendIntent()
 
   // Step 1: login
   if (authStatus !== 'authenticated') {
@@ -194,7 +200,7 @@ export function Demo() {
   if (txHash) return <p>Done! tx: {txHash}</p>
 
   return (
-    <button onClick={() => sendIntent(sessionKey.sessionId, {
+    <button onClick={() => sendIntentWithSessionKey(sessionKey.sessionId, {
       target: '0xTokenContract',
       calldata: '0xa9059cbb...',
       value: '0',
@@ -210,10 +216,11 @@ export function Demo() {
 ## What happens under the hood
 
 1. `POST /auth/login` — server issues a short-lived JWT (1 hour)
-2. `POST /account/create` — server records the counterfactual address; no key custody
-3. `POST /session-key/issue` — server stores only the SHA-256 hash of the key
-4. `POST /intent/execute` — server validates scope, submits to Pimlico, returns 202
-5. `GET /intent/:id/status` — SDK polls until `confirmed` or `failed`
+2. `POST /auth/logout` — invalidates the JWT server-side; the token SHA-256 hash is added to the `token_denylist` table
+3. `POST /account/create` — server records the counterfactual address; no key custody
+4. `POST /session-key/issue` — server stores only the SHA-256 hash of the key
+5. `POST /intent/execute` — server validates scope, builds UserOperation (GAP-001), submits to Pimlico, returns 202
+6. `GET /intent/:id/status` — SDK polls until `confirmed` or `failed`
 
 No private keys ever leave the client. The server cannot move funds on your behalf.
 

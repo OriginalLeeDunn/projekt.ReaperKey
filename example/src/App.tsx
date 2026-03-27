@@ -89,8 +89,12 @@ export default function App() {
   const [privKey, setPrivKey] = useState<string | null>(null)
 
   // ── Intent ──
-  const { status: intentStatus, txHash, error: intentError, sendIntent, reset: resetIntent } = useSendIntent()
+  const { status: intentStatus, txHash, error: intentError, sendIntentWithSessionKey, reset: resetIntent } = useSendIntent()
   const [targetAddr, setTargetAddr] = useState('0x70997970C51812dc3A010C7d01b50e0d17dc79C8')
+
+  // Pimlico bundler URL — set VITE_BUNDLER_URL in .env for real submissions
+  const bundlerUrl = import.meta.env.VITE_BUNDLER_URL ?? 'https://api.pimlico.io/v2/84532/rpc?apikey=YOUR_KEY'
+  const rpcUrl = import.meta.env.VITE_RPC_URL ?? 'https://sepolia.base.org'
 
   // ── Handlers ──
 
@@ -120,16 +124,21 @@ export default function App() {
   }
 
   async function handleSendIntent() {
-    if (!sessionKey) return
+    if (!sessionKey || !account || !privKey) return
     resetIntent()
     // ERC-20 transfer calldata: transfer(address, uint256) with 1 token unit
     const calldata = '0xa9059cbb' +
       targetAddr.replace('0x', '').padStart(64, '0') +
       '0000000000000000000000000000000000000000000000000de0b6b3a7640000'
-    await sendIntent(sessionKey.sessionId, {
+    await sendIntentWithSessionKey(sessionKey.sessionId, {
       target: targetAddr,
       calldata: '0x' + calldata.slice(2),
       value: '0',
+      sessionKeyPrivateKey: privKey as `0x${string}`,
+      senderAddress: account.address as `0x${string}`,
+      chainId: 84532,
+      rpcUrl,
+      bundlerUrl,
     })
   }
 
