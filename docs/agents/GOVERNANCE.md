@@ -183,7 +183,7 @@ Hard Rules are inviolable. No agent, no automation, no deadline exempts complian
 |---|------|-------------|
 | 1 | All Rust code must pass `cargo fmt --check` before commit | pre-commit hook |
 | 2 | No merge to main if CI is red | GitHub branch protection |
-| 3 | No direct commits to main — EVER. Branch → PR → merge only. | Governor + DevOps |
+| 3 | No direct commits to `main` OR `dev` — EVER. All changes go feat/fix branch → dev → main. | Governor + DevOps |
 | 4 | Every PR must have a linked GitHub Issue (feat/fix) or be labeled `chore`/`docs` | PR Manager |
 | 5 | Coverage must not drop below 80% (Rust) or 80% (SDK) | CI gate |
 | 6 | No secrets or private keys in the repo | pre-commit + Dep Scanner |
@@ -192,39 +192,79 @@ Hard Rules are inviolable. No agent, no automation, no deadline exempts complian
 | 9 | Phase N+1 cannot start until Phase N issues are resolved and GitHub release is tagged | Orchestrator |
 | 10 | All public API changes must update `STACK.md` and `docs/api/endpoints.md` | Architect + Docs Agent |
 | 11 | `cargo audit` must pass (or explicitly ignored with documented rationale) on every merge | Dep Scanner |
-| 12 | No direct commits to main — branch + PR required for all changes, including docs and hotfixes | Governor |
+| 12 | No direct commits to `main` or `dev` — ALL changes go feat/fix/hotfix/docs/chore branch → PR to `dev` → CI green → PR to `main` → CI green → human confirms merge | Governor |
 | 13 | Any phase touching intent execution requires a real bundler E2E test (not wiremock-only) before sign-off | QA Agent |
 
-**Rule #12 violation record:** 2026-03-26 — hotfix docs committed directly to main during post-demo audit. Logged. Process tightened.
+**Rule #12 violation record:**
+- 2026-03-26 — hotfix docs committed directly to main during post-demo audit.
+- 2026-03-26 — agent system overhaul PR opened against main instead of dev.
+Both logged. This has been expressed by the Founder multiple times. Zero exceptions going forward.
+
+---
+
+## Branch Strategy
+
+```
+main      ← stable only. Tagged releases. Never committed to directly.
+  ▲
+  │  PR (dev → main): CI must be GREEN. Human observes and confirms. No assumptions.
+  │
+dev       ← integration branch. Never committed to directly.
+  ▲
+  │  PR (feat → dev): CI must be GREEN before merge.
+  │
+feat/xxx  ← all work happens here
+fix/xxx
+hotfix/xxx
+chore/xxx
+docs/xxx
+ops/xxx
+release/xxx
+```
+
+**No exceptions. Hotfixes go through dev too. Always.**
 
 ---
 
 ## PR Workflow Protocol
 
-All changes — code, docs, hotfixes, agent files — follow this flow:
+All changes — code, docs, hotfixes, agent files — follow this exact flow:
 
 ```
-1. git checkout -b <type>/<description>
-   type: feat | fix | docs | chore | hotfix | ops
+# Step 1: Always start from dev
+git checkout dev && git pull origin dev
 
-2. Make changes. Commit to branch with conventional commit message.
+# Step 2: Create your branch
+git checkout -b <type>/<short-description>
+  type: feat | fix | hotfix | docs | chore | ops | release
 
-3. git push -u origin <branch>
+# Step 3: Do the work. Commit with conventional message.
+git commit -m "[AgentName] type: description"
 
-4. gh pr create --base main --head <branch> --title "..." --body "..."
-   Body must include: What changed, Why, Which agent(s) did the work,
-   Links to related GitHub Issues.
+# Step 4: Push branch
+git push -u origin <type>/<short-description>
 
-5. CI must be green before merge.
+# Step 5: PR to dev (NOT main)
+gh pr create --base dev --head <type>/<short-description> \
+  --title "[Agent] type: description" \
+  --body "..."
 
-6. Merge via GitHub (squash or merge commit per DECISIONS.md).
+# Step 6: Wait for CI green. Human or auto-merge into dev.
+
+# Step 7: When dev is ready for release, PR dev → main
+gh pr create --base main --head dev \
+  --title "chore: release vX.X.X" \
+  --body "..."
+
+# Step 8: CI must be green. Human observes and confirms. Then merge.
 ```
 
-**Claude-specific rule:** When Claude is acting as the Orchestrator and makes code/doc changes:
-- ALWAYS create a branch first
-- NEVER use `git push origin main` directly
-- Use `gh pr create` after committing to the branch
-- Label the PR with the relevant agent(s): `[Backend]`, `[SDK]`, `[Docs]`, `[DevOps]`, etc.
+**Claude-specific rules:**
+- ALWAYS run `git checkout dev && git pull origin dev` before creating any branch
+- NEVER use `--base main` on a feature/fix/hotfix/docs/chore branch — always `--base dev`
+- NEVER push directly to `dev` or `main`
+- Only `dev` itself opens PRs to `main`
+- Label every PR with the responsible agent(s): `[Backend]`, `[SDK]`, `[DevOps]`, etc.
 
 ---
 
