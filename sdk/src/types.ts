@@ -23,6 +23,23 @@ export interface Intent {
   userOperation?: Record<string, unknown>  // pre-built UserOp; defaults to {}
 }
 
+/** Parameters for automatic UserOp construction (GAP-001 / v1.0) */
+export interface IntentWithSessionKey {
+  target: string
+  calldata: string
+  value?: string
+  /** Session key private key — signs the UserOp in-browser, never sent to server */
+  sessionKeyPrivateKey: `0x${string}`
+  /** Smart account (Kernel) address */
+  senderAddress: `0x${string}`
+  /** Chain ID (84532 = Base Sepolia, 8453 = Base, 42161 = Arbitrum) */
+  chainId: number
+  /** RPC URL for the chain */
+  rpcUrl: string
+  /** Pimlico bundler URL with API key */
+  bundlerUrl: string
+}
+
 export interface IntentResult {
   intentId: string
   status: IntentStatus
