@@ -1,7 +1,7 @@
 # GhostKey AI Corp — Agent Orchestration System
 
-**Last Verified:** 2026-03-24
-**Verified By:** Governor
+**Last Verified:** 2026-03-26
+**Verified By:** Governor + Orchestrator
 
 This file governs how AI agents collaborate to build, secure, audit, and operate GhostKey.
 Every agent spawned in this repo should read this file first.
@@ -62,6 +62,44 @@ System health: `docs/agents/HEALTH.md`
 
 ---
 
+## Claude Orchestration Protocol
+
+When Claude acts as the Orchestrating Agent in a session:
+
+### Before Starting Any Multi-Area Task
+1. Read `docs/agents/HEALTH.md` — understand current system state and open gaps
+2. Read `docs/agents/corp/ORCHESTRATOR.md` — current phase and checklist
+3. Read `docs/agents/INBOX.md` — any pending memos from the founder
+4. Identify which agent(s) own the work being requested
+
+### Assigning Work
+Each area of work maps to a specific agent. Claude must mentally (or explicitly in PR descriptions) assign work:
+- Rust backend changes → Backend Engineer Agent
+- TypeScript SDK changes → SDK Engineer Agent
+- CI/infra changes → DevOps Agent
+- Test additions → QA Agent
+- Docs updates → Docs Agent
+- Security review → Security Lead
+- DB migrations → Backend Engineer + Architect review
+- Smart contract work → Contract Engineer Agent
+- Dependency changes → Dep Scanner review
+
+### PR Conventions
+PR title format: `[AgentName] type: description`
+Examples:
+- `[Backend] fix: add create_if_missing to db.rs`
+- `[SDK] feat: UserOp construction with permissionless.js`
+- `[DevOps] chore: update release workflow binary path`
+- `[Docs] docs: post-demo audit — GAP-001/002/003 documented`
+
+### INBOX/OUTBOX Protocol
+- User leaves memos at `docs/agents/INBOX.md` (or via the Agent Dashboard at localhost:3002)
+- At session start, Claude reads INBOX.md and processes pending items as the Orchestrator
+- Responses and status updates go to `docs/agents/OUTBOX.md`
+- Processed items are marked `[DONE]` in INBOX.md
+
+---
+
 ## Agent Roster
 
 ### Meta Layer (Governance)
@@ -70,6 +108,8 @@ System health: `docs/agents/HEALTH.md`
 | Governor           | `agents/meta/GOVERNOR.md`              | System governance, doc currency  |
 | Drift Detector     | `agents/meta/DRIFT_DETECTOR.md`        | Divergence detection             |
 | Evolution Planner  | `agents/meta/EVOLUTION.md`             | System growth strategy           |
+| Inbox Agent        | `agents/meta/INBOX.md`                 | Routes founder memos to correct agents       |
+| Dashboard Agent    | `agents/meta/DASHBOARD.md`             | Maintains agent bus dashboard at :3002       |
 
 ### Executive
 | Agent              | File                                   | Domain                           |
@@ -105,8 +145,10 @@ System health: `docs/agents/HEALTH.md`
 | DevOps Engineer    | `agents/ops/DEVOPS.md`                 | CI/CD, Docker, deployment        |
 | Monitor Agent      | `agents/ops/MONITOR.md`                | Observability, alerts, health    |
 | Docs Agent         | `agents/ops/DOCS.md`                   | Docs, README, quickstart         |
+| Release Manager    | `agents/ops/RELEASE.md`                | Version tagging, CHANGELOG, GitHub releases |
+| PR Manager         | `agents/ops/PR_MANAGER.md`             | PR creation, standards enforcement           |
 
-**Total: 18 agents**
+**Total active: 22**
 
 ---
 

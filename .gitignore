@@ -50,3 +50,6 @@ desktop.ini
 dist/
 build/
 out/
+dashboard/node_modules/
+dashboard/dist/
+dashboard/.env

@@ -1,7 +1,7 @@
 # GhostKey — System Governance
 
 **Maintained by:** Governor Agent
-**Last Verified:** 2026-03-24
+**Last Verified:** 2026-03-26
 **Status:** ACTIVE
 
 This document defines how the GhostKey agent system governs itself.
@@ -172,6 +172,59 @@ CODEBASE (once code exists)
 ## Output Format
 [what this agent produces and where it goes]
 ```
+
+---
+
+## Hard Rules
+
+Hard Rules are inviolable. No agent, no automation, no deadline exempts compliance.
+
+| # | Rule | Enforced By |
+|---|------|-------------|
+| 1 | All Rust code must pass `cargo fmt --check` before commit | pre-commit hook |
+| 2 | No merge to main if CI is red | GitHub branch protection |
+| 3 | No direct commits to main — EVER. Branch → PR → merge only. | Governor + DevOps |
+| 4 | Every PR must have a linked GitHub Issue (feat/fix) or be labeled `chore`/`docs` | PR Manager |
+| 5 | Coverage must not drop below 80% (Rust) or 80% (SDK) | CI gate |
+| 6 | No secrets or private keys in the repo | pre-commit + Dep Scanner |
+| 7 | All security-critical changes require Security Lead sign-off | Security Lead |
+| 8 | Non-Goals from PRD (`v1prd.md §8`) are hard blockers | Compliance Officer |
+| 9 | Phase N+1 cannot start until Phase N issues are resolved and GitHub release is tagged | Orchestrator |
+| 10 | All public API changes must update `STACK.md` and `docs/api/endpoints.md` | Architect + Docs Agent |
+| 11 | `cargo audit` must pass (or explicitly ignored with documented rationale) on every merge | Dep Scanner |
+| 12 | No direct commits to main — branch + PR required for all changes, including docs and hotfixes | Governor |
+| 13 | Any phase touching intent execution requires a real bundler E2E test (not wiremock-only) before sign-off | QA Agent |
+
+**Rule #12 violation record:** 2026-03-26 — hotfix docs committed directly to main during post-demo audit. Logged. Process tightened.
+
+---
+
+## PR Workflow Protocol
+
+All changes — code, docs, hotfixes, agent files — follow this flow:
+
+```
+1. git checkout -b <type>/<description>
+   type: feat | fix | docs | chore | hotfix | ops
+
+2. Make changes. Commit to branch with conventional commit message.
+
+3. git push -u origin <branch>
+
+4. gh pr create --base main --head <branch> --title "..." --body "..."
+   Body must include: What changed, Why, Which agent(s) did the work,
+   Links to related GitHub Issues.
+
+5. CI must be green before merge.
+
+6. Merge via GitHub (squash or merge commit per DECISIONS.md).
+```
+
+**Claude-specific rule:** When Claude is acting as the Orchestrator and makes code/doc changes:
+- ALWAYS create a branch first
+- NEVER use `git push origin main` directly
+- Use `gh pr create` after committing to the branch
+- Label the PR with the relevant agent(s): `[Backend]`, `[SDK]`, `[Docs]`, `[DevOps]`, etc.
 
 ---
 
