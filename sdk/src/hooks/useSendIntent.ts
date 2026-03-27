@@ -1,10 +1,15 @@
 // useSendIntent — SPEC-102, SPEC-103
+// v1.0: adds sendIntentWithSessionKey for automatic UserOp construction (GAP-001)
 import { useState } from 'react'
-import type { GhostKeyError, Intent, IntentResult, IntentStatus } from '../types.js'
+import type { GhostKeyError, Intent, IntentResult, IntentStatus, IntentWithSessionKey } from '../types.js'
 import { useGhostKey } from '../provider.js'
+import { buildUserOperation } from '../userop.js'
 
 export interface UseSendIntentReturn {
+  /** Legacy: caller provides a pre-built userOperation (or empty — for testing only) */
   sendIntent: (sessionId: string, intent: Intent) => Promise<IntentResult | null>
+  /** v1.0: builds + signs UserOp from session key, then submits */
+  sendIntentWithSessionKey: (sessionId: string, intent: IntentWithSessionKey) => Promise<IntentResult | null>
   status: IntentStatus | null
   txHash: string | null
   error: GhostKeyError | null
@@ -19,6 +24,45 @@ export function useSendIntent(): UseSendIntentReturn {
   const [status, setStatus] = useState<IntentStatus | null>(null)
   const [txHash, setTxHash] = useState<string | null>(null)
   const [error, setError] = useState<GhostKeyError | null>(null)
+
+  async function sendIntentWithSessionKey(
+    sessionId: string,
+    intent: IntentWithSessionKey,
+  ): Promise<IntentResult | null> {
+    if (!client.isAuthenticated()) {
+      setError({ code: 'not_authenticated', message: 'Login required' })
+      return null
+    }
+
+    setError(null)
+    setStatus('pending')
+    setTxHash(null)
+
+    let userOperation: Record<string, unknown>
+    try {
+      userOperation = await buildUserOperation({
+        sender: intent.senderAddress,
+        sessionKeyPrivateKey: intent.sessionKeyPrivateKey,
+        target: intent.target as `0x${string}`,
+        calldata: intent.calldata as `0x${string}`,
+        value: intent.value ? BigInt(intent.value) : BigInt(0),
+        chainId: intent.chainId,
+        rpcUrl: intent.rpcUrl,
+        bundlerUrl: intent.bundlerUrl,
+      }) as unknown as Record<string, unknown>
+    } catch (e) {
+      setStatus(null)
+      setError({ code: 'unknown', message: `UserOp build failed: ${String(e)}` })
+      return null
+    }
+
+    return await sendIntent(sessionId, {
+      target: intent.target,
+      calldata: intent.calldata,
+      ...(intent.value !== undefined ? { value: intent.value } : {}),
+      userOperation,
+    })
+  }
 
   async function sendIntent(sessionId: string, intent: Intent): Promise<IntentResult | null> {
     // SPEC-102: require authentication
@@ -78,7 +122,7 @@ export function useSendIntent(): UseSendIntentReturn {
     setError(null)
   }
 
-  return { sendIntent, status, txHash, error, reset }
+  return { sendIntent, sendIntentWithSessionKey, status, txHash, error, reset }
 }
 
 function sleep(ms: number): Promise<void> {

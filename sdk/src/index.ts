@@ -17,8 +17,11 @@ export type {
   Intent,
   IntentResult,
   IntentStatus,
+  IntentWithSessionKey,
   AuthMethod,
   SessionKeyRequest,
   SessionKeyResponse,
   RecoveryResult,
 } from './types.js'
+export { buildUserOperation, getUserOpHash, ENTRY_POINT_V06, CHAIN_CONFIGS } from './userop.js'
+export type { UserOperation, BuildUserOpParams } from './userop.js'
