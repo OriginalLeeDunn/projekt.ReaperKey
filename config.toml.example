@@ -25,7 +25,7 @@ cors_origins = ["http://localhost:3000"]
 log_format = "pretty"
 
 [database]
-url = "sqlite:./ghostkey.db"   # SQLite path; sqlite::memory: for ephemeral
+url = "sqlite:./db/ghostkey.db"   # SQLite path; sqlite::memory: for ephemeral
 
 [auth]
 # REQUIRED: minimum 32 characters. Generate with:
