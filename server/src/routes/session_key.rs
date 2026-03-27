@@ -10,6 +10,19 @@ use crate::{
 };
 
 /// POST /session-key/issue — SPEC-020, SPEC-021, SPEC-022, SPEC-023
+#[utoipa::path(
+    post,
+    path = "/session-key/issue",
+    tag = "session",
+    security(("bearer_token" = [])),
+    request_body = crate::models::session::IssueSessionKeyRequest,
+    responses(
+        (status = 201, description = "Session key issued", body = crate::models::session::SessionKeyResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Account not found"),
+    )
+)]
 #[tracing::instrument(skip(state, body), fields(user_id = %auth.user_id, account_id = %body.account_id))]
 pub async fn issue(
     State(state): State<AppState>,

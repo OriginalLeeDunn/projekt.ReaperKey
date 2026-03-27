@@ -14,6 +14,20 @@ use crate::{
 };
 
 /// POST /intent/execute — SPEC-030, SPEC-034, SPEC-035
+#[utoipa::path(
+    post,
+    path = "/intent/execute",
+    tag = "intent",
+    security(("bearer_token" = [])),
+    request_body = crate::models::intent::ExecuteIntentRequest,
+    responses(
+        (status = 202, description = "Intent accepted and submitted", body = crate::models::intent::IntentResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Session not found"),
+        (status = 429, description = "Rate limited"),
+    )
+)]
 #[tracing::instrument(skip(state, body), fields(user_id = %auth.user_id, session_id = %body.session_id))]
 pub async fn execute(
     State(state): State<AppState>,
@@ -120,6 +134,21 @@ pub async fn execute(
 }
 
 /// GET /intent/:id/status — SPEC-031, SPEC-032, SPEC-033
+#[utoipa::path(
+    get,
+    path = "/intent/{id}/status",
+    tag = "intent",
+    security(("bearer_token" = [])),
+    params(
+        ("id" = uuid::Uuid, Path, description = "Intent UUID"),
+    ),
+    responses(
+        (status = 200, description = "Intent status", body = crate::models::intent::IntentResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Not found"),
+    )
+)]
 #[tracing::instrument(skip(state), fields(user_id = %auth.user_id))]
 pub async fn status(
     State(state): State<AppState>,

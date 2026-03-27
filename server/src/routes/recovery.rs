@@ -8,13 +8,23 @@ use crate::{
     routes::AppState,
 };
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct RecoveryInitRequest {
     pub account_address: String,
 }
 
 /// POST /recovery/initiate — SPEC-040
 /// Initiates recovery for an account. Does NOT grant server key access.
+#[utoipa::path(
+    post,
+    path = "/recovery/initiate",
+    tag = "recovery",
+    request_body = RecoveryInitRequest,
+    responses(
+        (status = 202, description = "Recovery initiated"),
+        (status = 404, description = "Account not found"),
+    )
+)]
 #[tracing::instrument(skip(state, body))]
 pub async fn init(
     State(state): State<AppState>,

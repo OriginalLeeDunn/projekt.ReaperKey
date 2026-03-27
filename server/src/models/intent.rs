@@ -38,7 +38,7 @@ impl DbIntent {
 
 /// POST /intent/execute
 /// The client builds and signs the UserOperation; server validates scope and routes it.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct ExecuteIntentRequest {
     pub session_id: Uuid,
     /// Target contract address — validated against session allowed_targets.
@@ -55,7 +55,7 @@ fn default_value() -> String {
     "0".to_string()
 }
 
-#[derive(Debug, Serialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Clone, PartialEq, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum IntentStatus {
     Pending,
@@ -88,7 +88,7 @@ impl IntentStatus {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct IntentResponse {
     pub intent_id: Uuid,
     pub status: IntentStatus,
