@@ -511,4 +511,46 @@ watch(join(REPO_ROOT, 'docs/agents'), { persistent: false }, (event, filename) =
 // (which go directly to the file, bypassing the directory watcher sometimes)
 watch(ACTIVITY_LOG, { persistent: false }, () => broadcastNewEntries())
 
+// ── CI Poller — synthesise ci entries from GitHub Actions runs ─────────────
+// GitHub Actions can't reach localhost:3003, so we poll from the server side
+// every 5 minutes and write a ci entry for each newly-completed run.
+const seenRunIds = new Set()
+
+async function pollCIRuns() {
+  try {
+    const token = process.env.GITHUB_TOKEN
+    if (!token) return
+    const headers = { 'User-Agent': 'ghostkey-dashboard', Authorization: `Bearer ${token}` }
+    const r = await fetch('https://api.github.com/repos/OriginalLeeDunn/projekt.ReaperKey/actions/runs?per_page=20', { headers })
+    if (!r.ok) return
+    const { workflow_runs: runs } = await r.json()
+    if (!Array.isArray(runs)) return
+
+    for (const run of runs) {
+      if (seenRunIds.has(run.id)) continue
+      seenRunIds.add(run.id)
+      if (run.status !== 'completed') continue  // only log finished runs
+      const conclusion = run.conclusion ?? 'unknown'
+      const status = conclusion === 'success' ? 'ok' : conclusion === 'failure' ? 'error' : 'warn'
+      const detail = `${run.name} — ${run.head_branch} — ${conclusion} (#${run.run_number})`
+      appendActivity({ event_type: 'ci', agent: 'CI', action: 'workflow_run', detail, status,
+        meta: { run_id: run.id, conclusion, branch: run.head_branch, workflow: run.name, url: run.html_url } })
+    }
+  } catch { /* silent — poller should never crash the server */ }
+}
+
+// Seed seen IDs from existing ci entries so we don't re-log runs from before startup
+try {
+  if (existsSync(ACTIVITY_LOG)) {
+    const lines = readFileSync(ACTIVITY_LOG, 'utf-8').trim().split('\n').filter(Boolean)
+    for (const line of lines) {
+      try { const e = JSON.parse(line); if (e.event_type === 'ci' && e.meta?.run_id) seenRunIds.add(e.meta.run_id) } catch { /* skip */ }
+    }
+  }
+} catch { /* skip */ }
+
+// Poll immediately on startup, then every 5 minutes
+pollCIRuns()
+setInterval(pollCIRuns, 5 * 60 * 1000)
+
 app.listen(3003, () => console.log('Dashboard API server running on :3003'))
