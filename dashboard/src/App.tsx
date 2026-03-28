@@ -240,6 +240,8 @@ function PRPanel() {
       {prs.map(pr => {
         const summary = prCheckSummary(pr.number)
         const canMerge = summary?.allGreen && pr.base.ref === 'dev' && !mergedNums.includes(pr.number) && !pr.draft
+        const ageDays = Math.floor((Date.now() - new Date(pr.created_at).getTime()) / 86400000)
+        const ageColor = ageDays > 7 ? 'red' : ageDays > 3 ? 'yellow' : 'grey'
         return (
           <div key={pr.number} style={{ marginBottom: '0.6rem', paddingBottom: '0.6rem', borderBottom: '1px solid #1a1a1a' }}>
             <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginBottom: '0.25rem', flexWrap: 'wrap' as const }}>
@@ -256,6 +258,7 @@ function PRPanel() {
               {!summary && checks[pr.number] === undefined && (
                 <span style={{ ...S.mono, fontSize: '0.6rem', color: '#333' }}>checking...</span>
               )}
+              <span style={S.badge(ageColor)}>{ageDays === 0 ? 'today' : `${ageDays}d`}</span>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
               <span style={{ ...S.mono, fontSize: '0.65rem', color: '#444', flex: 1 }}>
@@ -279,6 +282,24 @@ function PRPanel() {
 // ── Issues Panel ──────────────────────────────────────────────────────────────
 interface GHIssue { number: number; title: string; html_url: string; labels: { name: string }[]; created_at: string }
 
+// Shared label color helper
+function labelColor(name: string): string {
+  if (name === 'critical') return 'red'
+  if (name === 'bug') return 'red'
+  if (name.startsWith('v1') || name === 'on-chain') return 'yellow'
+  if (name === 'sdk' || name === 'Backend' || name === 'backend') return 'blue'
+  if (name === 'security' || name === 'Security') return 'purple'
+  if (name === 'enhancement' || name === 'feature') return 'green'
+  return 'grey'
+}
+
+function issueSeverity(issue: GHIssue): number {
+  if (issue.labels.some(l => l.name === 'critical')) return 0
+  if (issue.labels.some(l => l.name === 'bug')) return 1
+  if (issue.labels.some(l => l.name === 'enhancement')) return 2
+  return 3
+}
+
 function IssuesPanel() {
   const [issues, setIssues] = useState<GHIssue[]>([])
   const [loading, setLoading] = useState(true)
@@ -291,31 +312,126 @@ function IssuesPanel() {
       .catch(() => { setError('GitHub API error'); setLoading(false) })
   }, [])
 
-  const labelColor = (name: string) => {
-    if (name === 'critical' || name === 'bug') return 'red'
-    if (name.startsWith('v1') || name === 'on-chain') return 'yellow'
-    if (name === 'sdk') return 'blue'
-    return 'grey'
-  }
+  const sorted = [...issues].sort((a, b) => issueSeverity(a) - issueSeverity(b))
+  const critical = issues.filter(i => i.labels.some(l => l.name === 'critical')).length
 
   return (
     <div style={S.card}>
-      <div style={S.cardTitle}>Open Issues <span style={S.badge(issues.length > 0 ? 'yellow' : 'green')}>{issues.length}</span></div>
+      <div style={S.cardTitle}>
+        Open Issues
+        <span style={S.badge(issues.length > 0 ? 'yellow' : 'green')}>{issues.length}</span>
+        {critical > 0 && <span style={S.badge('red')}>{critical} critical</span>}
+      </div>
       {loading && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
       {error && <div style={{ color: '#f87171', fontSize: '0.75rem' }}>{error}</div>}
       {!loading && !error && issues.length === 0 && <div style={{ color: '#4ade80', fontSize: '0.8rem' }}>No open issues</div>}
-      {issues.map(issue => (
-        <div key={issue.number} style={{ marginBottom: '0.6rem', paddingBottom: '0.6rem', borderBottom: '1px solid #1a1a1a' }}>
-          <div style={{ fontSize: '0.78rem', marginBottom: '0.25rem' }}>
-            <a href={issue.html_url} target="_blank" rel="noreferrer" style={{ color: '#60a5fa', textDecoration: 'none' }}>
-              #{issue.number} {issue.title}
-            </a>
+      {sorted.map(issue => {
+        const ageDays = Math.floor((Date.now() - new Date(issue.created_at).getTime()) / 86400000)
+        return (
+          <div key={issue.number} style={{ marginBottom: '0.5rem', paddingBottom: '0.5rem', borderBottom: '1px solid #1a1a1a' }}>
+            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'baseline', marginBottom: '0.2rem' }}>
+              <a href={issue.html_url} target="_blank" rel="noreferrer" style={{ color: '#60a5fa', textDecoration: 'none', fontSize: '0.78rem', flex: 1 }}>
+                #{issue.number} {issue.title}
+              </a>
+              <span style={{ ...S.mono, fontSize: '0.6rem', color: '#333', whiteSpace: 'nowrap' as const }}>{ageDays}d</span>
+            </div>
+            <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' as const }}>
+              {issue.labels.map(l => <span key={l.name} style={{ ...S.badge(labelColor(l.name)), fontSize: '0.58rem' }}>{l.name}</span>)}
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' as const }}>
-            {issue.labels.map(l => <span key={l.name} style={{ ...S.badge(labelColor(l.name)), fontSize: '0.58rem' }}>{l.name}</span>)}
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Issues Full-Tab Panel ─────────────────────────────────────────────────────
+const ISSUE_LABEL_FILTERS = ['All', 'critical', 'bug', 'enhancement', 'Backend', 'SDK', 'Security', 'QA', 'DevOps', 'Docs', 'Audit']
+
+function IssuesTabPanel() {
+  const [issues, setIssues] = useState<GHIssue[]>([])
+  const [loading, setLoading] = useState(true)
+  const [activeLabel, setActiveLabel] = useState('All')
+  const [search, setSearch] = useState('')
+
+  const load = useCallback((label: string) => {
+    setLoading(true)
+    const url = label !== 'All' ? `/api/github/issues?labels=${encodeURIComponent(label)}` : '/api/github/issues'
+    fetch(url).then(r => r.json())
+      .then(d => { setIssues(Array.isArray(d) ? d : []); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [])
+
+  useEffect(() => { load(activeLabel) }, [load, activeLabel])
+
+  const filtered = search.trim() ? issues.filter(i => i.title.toLowerCase().includes(search.toLowerCase()) || String(i.number).includes(search)) : issues
+  const sorted = [...filtered].sort((a, b) => issueSeverity(a) - issueSeverity(b))
+
+  const stats = {
+    critical: issues.filter(i => i.labels.some(l => l.name === 'critical')).length,
+    bugs: issues.filter(i => i.labels.some(l => l.name === 'bug')).length,
+    enhancements: issues.filter(i => i.labels.some(l => l.name === 'enhancement')).length,
+  }
+
+  return (
+    <div style={S.col}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
+        {[
+          { label: 'Open Issues', value: issues.length, color: issues.length > 0 ? 'yellow' : 'green' },
+          { label: 'Critical', value: stats.critical, color: stats.critical > 0 ? 'red' : 'grey' },
+          { label: 'Bugs', value: stats.bugs, color: stats.bugs > 0 ? 'red' : 'grey' },
+          { label: 'Enhancements', value: stats.enhancements, color: 'blue' },
+        ].map(s => (
+          <div key={s.label} style={{ ...S.card, padding: '0.75rem', textAlign: 'center' as const }}>
+            <div style={{ fontSize: '1.4rem', fontWeight: 700, fontFamily: 'monospace', color: s.color === 'red' ? '#f87171' : s.color === 'yellow' ? '#fbbf24' : s.color === 'green' ? '#4ade80' : s.color === 'blue' ? '#60a5fa' : '#555' }}>{s.value}</div>
+            <div style={{ fontSize: '0.6rem', color: '#444', textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginTop: '0.2rem' }}>{s.label}</div>
           </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' as const, alignItems: 'center' }}>
+        {ISSUE_LABEL_FILTERS.map(label => (
+          <button key={label} onClick={() => setActiveLabel(label)}
+            style={{ ...S.btn(false, activeLabel === label ? undefined : 'ghost'), fontSize: '0.65rem', padding: '0.2rem 0.55rem' }}>
+            {label}
+          </button>
+        ))}
+        <input style={{ ...S.input, marginLeft: 'auto', width: 200, marginBottom: 0, fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}
+          placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} />
+        <button onClick={() => load(activeLabel)} style={{ background: 'none', border: '1px solid #333', borderRadius: 3, color: '#555', fontSize: '0.62rem', padding: '0.25rem 0.5rem', cursor: 'pointer' }}>↻</button>
+      </div>
+
+      <div style={S.card}>
+        <div style={S.cardTitle}>
+          {activeLabel === 'All' ? 'All Issues' : `[${activeLabel}] Issues`}
+          <span style={S.badge(sorted.length > 0 ? 'yellow' : 'green')}>{sorted.length}</span>
         </div>
-      ))}
+        {loading && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
+        {!loading && sorted.length === 0 && <div style={{ color: '#4ade80', fontSize: '0.8rem' }}>No open issues{activeLabel !== 'All' ? ` labeled "${activeLabel}"` : ''}.</div>}
+        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '0.4rem' }}>
+          {sorted.map(issue => {
+            const ageDays = Math.floor((Date.now() - new Date(issue.created_at).getTime()) / 86400000)
+            const isCritical = issue.labels.some(l => l.name === 'critical')
+            const isBug = issue.labels.some(l => l.name === 'bug')
+            return (
+              <div key={issue.number} style={{ padding: '0.5rem 0.65rem', background: '#0f0f0f', border: `1px solid ${isCritical ? '#7f1d1d' : isBug ? '#431010' : '#1e1e1e'}`, borderRadius: 6 }}>
+                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'baseline', marginBottom: '0.25rem' }}>
+                  <a href={issue.html_url} target="_blank" rel="noreferrer"
+                    style={{ color: '#60a5fa', textDecoration: 'none', fontSize: '0.78rem', fontWeight: 500, flex: 1 }}>
+                    #{issue.number} {issue.title}
+                  </a>
+                  <span style={{ ...S.mono, fontSize: '0.6rem', color: ageDays > 7 ? '#f87171' : ageDays > 3 ? '#fbbf24' : '#333', whiteSpace: 'nowrap' as const }}>
+                    {ageDays === 0 ? 'today' : `${ageDays}d ago`}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' as const }}>
+                  {issue.labels.map(l => <span key={l.name} style={{ ...S.badge(labelColor(l.name)), fontSize: '0.58rem' }}>{l.name}</span>)}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
@@ -455,11 +571,15 @@ function RosterPanel() {
 // ── Phases Panel ──────────────────────────────────────────────────────────────
 interface Phase { name: string; done: boolean; active: boolean; items: { text: string; done: boolean }[] }
 
+interface GapRow { id: string; area: string; description: string; severity?: string; blocks?: string }
+
 function PhasesPanel() {
   const [phases, setPhases] = useState<Phase[]>([])
   const [loading, setLoading] = useState(true)
+  const [gaps, setGaps] = useState<GapRow[]>([])
 
   useEffect(() => {
+    fetch('/api/health/gaps').then(r => r.json()).then(d => setGaps(Array.isArray(d) ? d : [])).catch(() => {})
     fetch('/api/phases')
       .then(r => r.json())
       .then(({ content }) => {
@@ -497,50 +617,72 @@ function PhasesPanel() {
   const pct = totalItems > 0 ? Math.round((doneItems / totalItems) * 100) : 0
 
   return (
-    <div style={S.card}>
-      <div style={S.cardTitle}>
-        Phase Progress
-        <span style={S.badge(pct === 100 ? 'green' : pct > 50 ? 'blue' : 'yellow')}>{pct}%</span>
-        <span style={{ ...S.mono, fontSize: '0.65rem', marginLeft: 'auto' }}>{doneItems}/{totalItems} items</span>
-      </div>
-      {loading && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
-      {!loading && phases.length > 0 && (
-        <div style={{ marginBottom: '1rem' }}>
-          <div style={{ height: 4, background: '#1a1a1a', borderRadius: 2, overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${pct}%`, background: '#2563eb', borderRadius: 2, transition: 'width 0.4s' }} />
-          </div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 360px', gap: '1rem', alignItems: 'start' }}>
+      <div style={S.card}>
+        <div style={S.cardTitle}>
+          Phase Progress
+          <span style={S.badge(pct === 100 ? 'green' : pct > 50 ? 'blue' : 'yellow')}>{pct}%</span>
+          <span style={{ ...S.mono, fontSize: '0.65rem', marginLeft: 'auto' }}>{doneItems}/{totalItems} items</span>
         </div>
-      )}
-      {phases.map(phase => (
-        <div key={phase.name} style={S.phaseRow(phase.done, phase.active)}>
-          <span style={{ fontSize: '0.9rem', lineHeight: 1, marginTop: 2 }}>
-            {phase.done ? '✓' : phase.active ? '▶' : '○'}
-          </span>
-          <div style={{ flex: 1 }}>
-            <div
-              style={{ fontSize: '0.78rem', color: phase.done ? '#4ade80' : phase.active ? '#e0e0e0' : '#666', fontWeight: phase.active ? 700 : 400, cursor: phase.items.length > 0 ? 'pointer' : 'default', display: 'flex', justifyContent: 'space-between' }}
-              onClick={() => phase.items.length > 0 && setExpanded(expanded === phase.name ? null : phase.name)}
-            >
-              <span>{phase.name}</span>
-              {phase.items.length > 0 && (
-                <span style={{ ...S.mono, fontSize: '0.62rem', color: '#444' }}>
-                  {phase.items.filter(i => i.done).length}/{phase.items.length} {expanded === phase.name ? '▲' : '▼'}
-                </span>
+        {loading && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
+        {!loading && phases.length > 0 && (
+          <div style={{ marginBottom: '1rem' }}>
+            <div style={{ height: 4, background: '#1a1a1a', borderRadius: 2, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${pct}%`, background: '#2563eb', borderRadius: 2, transition: 'width 0.4s' }} />
+            </div>
+          </div>
+        )}
+        {phases.map(phase => (
+          <div key={phase.name} style={S.phaseRow(phase.done, phase.active)}>
+            <span style={{ fontSize: '0.9rem', lineHeight: 1, marginTop: 2 }}>
+              {phase.done ? '✓' : phase.active ? '▶' : '○'}
+            </span>
+            <div style={{ flex: 1 }}>
+              <div
+                style={{ fontSize: '0.78rem', color: phase.done ? '#4ade80' : phase.active ? '#e0e0e0' : '#666', fontWeight: phase.active ? 700 : 400, cursor: phase.items.length > 0 ? 'pointer' : 'default', display: 'flex', justifyContent: 'space-between' }}
+                onClick={() => phase.items.length > 0 && setExpanded(expanded === phase.name ? null : phase.name)}
+              >
+                <span>{phase.name}</span>
+                {phase.items.length > 0 && (
+                  <span style={{ ...S.mono, fontSize: '0.62rem', color: '#444' }}>
+                    {phase.items.filter(i => i.done).length}/{phase.items.length} {expanded === phase.name ? '▲' : '▼'}
+                  </span>
+                )}
+              </div>
+              {expanded === phase.name && (
+                <div style={{ marginTop: '0.4rem' }}>
+                  {phase.items.map((item, i) => (
+                    <div key={i} style={{ ...S.mono, fontSize: '0.68rem', color: item.done ? '#4ade80' : '#555', marginBottom: '0.15rem' }}>
+                      {item.done ? '✓' : '○'} {item.text}
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
-            {expanded === phase.name && (
-              <div style={{ marginTop: '0.4rem' }}>
-                {phase.items.map((item, i) => (
-                  <div key={i} style={{ ...S.mono, fontSize: '0.68rem', color: item.done ? '#4ade80' : '#555', marginBottom: '0.15rem' }}>
-                    {item.done ? '✓' : '○'} {item.text}
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
+        ))}
+        {!loading && phases.length === 0 && <div style={{ color: '#444', fontSize: '0.8rem' }}>Could not parse phase data.</div>}
+      </div>
+
+      {/* Known gaps sidebar */}
+      <div style={S.card}>
+        <div style={S.cardTitle}>
+          Known Gaps
+          <span style={S.badge(gaps.length > 0 ? 'red' : 'green')}>{gaps.length}</span>
         </div>
-      ))}
-      {!loading && phases.length === 0 && <div style={{ color: '#444', fontSize: '0.8rem' }}>Could not parse phase data.</div>}
+        {gaps.length === 0 && <div style={{ color: '#444', fontSize: '0.8rem' }}>No critical gaps.</div>}
+        {gaps.map((gap, i) => (
+          <div key={i} style={{ marginBottom: '0.6rem', paddingBottom: '0.6rem', borderBottom: '1px solid #1a1a1a' }}>
+            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginBottom: '0.2rem', flexWrap: 'wrap' as const }}>
+              <span style={S.badge('red')}>{gap.id}</span>
+              {gap.severity && <span style={S.badge('yellow')}>{gap.severity}</span>}
+              <span style={{ fontSize: '0.72rem', color: '#888' }}>{gap.area}</span>
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#f87171', marginBottom: '0.15rem' }}>{gap.description}</div>
+            {gap.blocks && <div style={{ fontSize: '0.65rem', color: '#555' }}>Blocks: {gap.blocks}</div>}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -641,24 +783,29 @@ function MemoCenterPanel() {
 }
 
 // ── Decisions Panel ───────────────────────────────────────────────────────────
+interface DecisionEntry { date: string; agent: string; title: string; phase: string; status: string; reviews: string; body: string }
+
 function DecisionsPanel() {
-  const [content, setContent] = useState('')
+  const [entries, setEntries] = useState<DecisionEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
+  const [expanded, setExpanded] = useState<number | null>(null)
 
   useEffect(() => {
-    fetch('/api/decisions').then(r => r.json()).then(d => { setContent(d.content); setLoading(false) }).catch(() => setLoading(false))
+    fetch('/api/decisions/structured').then(r => r.json())
+      .then(d => { setEntries(Array.isArray(d) ? d : []); setLoading(false) })
+      .catch(() => setLoading(false))
   }, [])
 
-  const entries = content.split(/(?=^### DEC-)/m).filter(s => s.startsWith('### DEC-'))
-  const filtered = filter ? entries.filter(e => e.toLowerCase().includes(filter.toLowerCase())) : entries
+  const filtered = filter
+    ? entries.filter(e => `${e.title} ${e.agent} ${e.date} ${e.body}`.toLowerCase().includes(filter.toLowerCase()))
+    : entries
 
-  const dates = entries.map(e => e.match(/(\d{4}-\d{2}-\d{2})/)?.[1]).filter(Boolean) as string[]
-  const latestDate = dates.sort().reverse()[0]
-  const thisWeek = dates.filter(d => {
-    const ms = Date.now() - new Date(d).getTime()
-    return ms < 7 * 24 * 60 * 60 * 1000
-  }).length
+  const sorted = [...filtered].reverse()
+  const latestDate = [...entries].sort((a, b) => b.date.localeCompare(a.date))[0]?.date
+  const thisWeek = entries.filter(e => Date.now() - new Date(e.date).getTime() < 7 * 24 * 60 * 60 * 1000).length
+
+  const statusColor = (s: string) => s.toLowerCase().includes('reject') ? 'red' : s.toLowerCase().includes('pending') ? 'yellow' : 'green'
 
   return (
     <div style={S.col}>
@@ -676,21 +823,29 @@ function DecisionsPanel() {
       </div>
       <div style={S.card}>
         <div style={S.cardTitle}>Decision Log <span style={S.badge('blue')}>{filtered.length}/{entries.length}</span></div>
-        <input style={{ ...S.input, marginBottom: '0.75rem' }} placeholder="Filter decisions..." value={filter} onChange={e => setFilter(e.target.value)} />
+        <input style={{ ...S.input, marginBottom: '0.75rem' }} placeholder="Filter by title, agent, date..." value={filter} onChange={e => setFilter(e.target.value)} />
         {loading && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
-        {!loading && filtered.length === 0 && <div style={{ color: '#444', fontSize: '0.8rem' }}>No decisions found.</div>}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: 560, overflow: 'auto' }}>
-          {[...filtered].reverse().map((entry, i) => {
-            const titleLine = entry.split('\n')[0].replace('### ', '')
-            const rest = entry.split('\n').slice(1).join('\n').trim()
-            const dateMatch = titleLine.match(/\d{4}-\d{2}-\d{2}/)
+        {!loading && sorted.length === 0 && <div style={{ color: '#444', fontSize: '0.8rem' }}>No decisions found.</div>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: 580, overflow: 'auto' }}>
+          {sorted.map((entry, i) => {
+            const isOpen = expanded === i
             return (
               <div key={i} style={{ background: '#0f0f0f', border: '1px solid #1e1e1e', borderRadius: 6, padding: '0.6rem 0.75rem' }}>
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'baseline', marginBottom: '0.3rem' }}>
-                  <span style={{ fontSize: '0.78rem', color: '#93c5fd', fontWeight: 600 }}>{titleLine}</span>
-                  {dateMatch && <span style={{ ...S.mono, fontSize: '0.6rem', color: '#333', marginLeft: 'auto', whiteSpace: 'nowrap' as const }}>{dateMatch[0]}</span>}
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', cursor: 'pointer' }}
+                  onClick={() => setExpanded(isOpen ? null : i)}>
+                  <span style={S.mono}>{entry.date}</span>
+                  <span style={{ fontSize: '0.72rem', color: '#60a5fa', fontWeight: 600 }}>{entry.agent}</span>
+                  <span style={{ fontSize: '0.78rem', color: '#e0e0e0', flex: 1 }}>{entry.title}</span>
+                  {entry.status && <span style={S.badge(statusColor(entry.status))}>{entry.status}</span>}
+                  {entry.phase && <span style={S.badge('purple')}>{entry.phase}</span>}
+                  <span style={{ color: '#444', fontSize: '0.65rem' }}>{isOpen ? '▲' : '▼'}</span>
                 </div>
-                <MarkdownView content={rest} maxHeight={180} />
+                {isOpen && (
+                  <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #1e1e1e' }}>
+                    {entry.reviews && <div style={{ fontSize: '0.68rem', color: '#555', marginBottom: '0.4rem' }}>Reviewed by: {entry.reviews}</div>}
+                    <MarkdownView content={entry.body} maxHeight={240} />
+                  </div>
+                )}
               </div>
             )
           })}
@@ -1001,13 +1156,20 @@ function DatabasePanel() {
 }
 
 // ── Governance Panel ──────────────────────────────────────────────────────────
+interface HardRule { number: string; rule: string; enforcedBy: string }
+interface FreshnessRow { doc: string; lastVerified: string; threshold: string; status: string; nextCheck?: string }
+
 function GovernancePanel() {
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
+  const [hardRules, setHardRules] = useState<HardRule[]>([])
+  const [freshness, setFreshness] = useState<FreshnessRow[]>([])
 
   useEffect(() => {
     fetch('/api/governance').then(r => r.json()).then(d => { setContent(d.content); setLoading(false) }).catch(() => setLoading(false))
+    fetch('/api/governance/hard-rules').then(r => r.json()).then(d => setHardRules(Array.isArray(d) ? d : [])).catch(() => {})
+    fetch('/api/health/freshness').then(r => r.json()).then(d => setFreshness(Array.isArray(d) ? d : [])).catch(() => {})
   }, [])
 
   const sections = content.split(/(?=^## )/m).filter(s => s.trim())
@@ -1036,39 +1198,68 @@ function GovernancePanel() {
         </div>
       </div>
 
-      {/* CI discipline checklist */}
+      {/* Right column: hard rules + freshness */}
       <div style={S.col}>
-        <div style={S.card}>
-          <div style={S.cardTitle}>CI Gate Checklist</div>
-          {[
-            { label: 'feat branch CI green before PR', rule: true },
-            { label: 'PR CI green before merge to dev', rule: true },
-            { label: 'dev CI green before PR to main', rule: true },
-            { label: 'user confirmation before main merge', rule: true },
-            { label: 'one branch at a time through full cycle', rule: true },
-          ].map((item, i) => (
-            <div key={i} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.35rem' }}>
-              <span style={S.badge('green')}>✓</span>
-              <span style={{ fontSize: '0.78rem', color: '#aaa' }}>{item.label}</span>
+        {hardRules.length > 0 && (
+          <div style={S.card}>
+            <div style={S.cardTitle}>Hard Rules <span style={S.badge('red')}>{hardRules.length}</span></div>
+            <div style={{ maxHeight: 340, overflow: 'auto' }}>
+              {hardRules.map((r, i) => (
+                <div key={i} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', marginBottom: '0.4rem', paddingBottom: '0.4rem', borderBottom: '1px solid #1a1a1a' }}>
+                  <span style={S.badge('red')}>#{r.number}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.76rem', color: '#e0e0e0' }}>{r.rule}</div>
+                    {r.enforcedBy && <div style={{ fontSize: '0.62rem', color: '#555', marginTop: '0.15rem' }}>by: {r.enforcedBy}</div>}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <div style={S.card}>
-          <div style={S.cardTitle}>Branch Strategy</div>
-          {[
-            { branch: 'feat/*', desc: 'Feature work — CI required before PR' },
-            { branch: 'fix/*', desc: 'Bug fixes — CI required before PR' },
-            { branch: 'docs/*', desc: 'Docs only — CI required before PR' },
-            { branch: 'ops/*', desc: 'Infra/config — CI required before PR' },
-            { branch: 'dev', desc: 'Integration branch — always green' },
-            { branch: 'main', desc: 'Production — only from green dev, user confirmed' },
-          ].map((b, i) => (
-            <div key={i} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.3rem' }}>
-              <code style={{ ...S.mono, color: '#60a5fa', background: '#1e3a5f', padding: '0.1rem 0.35rem', borderRadius: 3, fontSize: '0.68rem' }}>{b.branch}</code>
-              <span style={{ fontSize: '0.75rem', color: '#666' }}>{b.desc}</span>
-            </div>
-          ))}
-        </div>
+          </div>
+        )}
+        {freshness.length > 0 && (
+          <div style={S.card}>
+            <div style={S.cardTitle}>Doc Freshness</div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  {['Doc', 'Verified', 'Threshold', 'Status'].map(h => <th key={h} style={S.tableHead}>{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {freshness.map((row, i) => {
+                  const status = (row.status ?? '').toLowerCase()
+                  const sc = status.includes('stale') ? 'red' : status.includes('warn') ? 'yellow' : 'green'
+                  return (
+                    <tr key={i}>
+                      <td style={{ ...S.tableCell, color: '#93c5fd' }}>{row.doc}</td>
+                      <td style={{ ...S.tableCell, color: '#aaa' }}>{row.lastVerified}</td>
+                      <td style={{ ...S.tableCell, color: '#888' }}>{row.threshold}</td>
+                      <td style={S.tableCell}><span style={S.badge(sc)}>{row.status || 'ok'}</span></td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {hardRules.length === 0 && freshness.length === 0 && (
+          <div style={S.card}>
+            <div style={S.cardTitle}>Branch Strategy</div>
+            {[
+              { branch: 'feat/*', desc: 'Feature work — CI required before PR' },
+              { branch: 'fix/*', desc: 'Bug fixes — CI required before PR' },
+              { branch: 'docs/*', desc: 'Docs only — CI required before PR' },
+              { branch: 'ops/*', desc: 'Infra/config — CI required before PR' },
+              { branch: 'dev', desc: 'Integration branch — always green' },
+              { branch: 'main', desc: 'Production — only from green dev, user confirmed' },
+            ].map((b, i) => (
+              <div key={i} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.3rem' }}>
+                <code style={{ ...S.mono, color: '#60a5fa', background: '#1e3a5f', padding: '0.1rem 0.35rem', borderRadius: 3, fontSize: '0.68rem' }}>{b.branch}</code>
+                <span style={{ fontSize: '0.75rem', color: '#666' }}>{b.desc}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -1561,16 +1752,235 @@ function ActivityPanel() {
   )
 }
 
+// ── Backend Health Widget ─────────────────────────────────────────────────────
+interface BackendHealthData { ok: boolean; status: number | null; data: { status: string; db: string; version?: string } | null }
+
+function BackendHealthWidget() {
+  const [health, setHealth] = useState<BackendHealthData | null>(null)
+  const [lastChecked, setLastChecked] = useState<string | null>(null)
+
+  const check = useCallback(() => {
+    fetch('/api/healthcheck').then(r => r.json())
+      .then(d => { setHealth(d); setLastChecked(new Date().toLocaleTimeString()) })
+      .catch(() => setHealth({ ok: false, status: null, data: null }))
+  }, [])
+
+  useEffect(() => {
+    check()
+    const t = setInterval(check, 30000)
+    return () => clearInterval(t)
+  }, [check])
+
+  const color = health === null ? 'grey' : health.ok && health.data?.status === 'ok' ? 'green' : 'red'
+
+  return (
+    <div style={S.card}>
+      <div style={S.cardTitle}>
+        Backend /health
+        <span style={S.badge(color)}>{health === null ? 'CHECKING' : health.ok ? (health.data?.status ?? 'UP').toUpperCase() : 'DOWN'}</span>
+        <button onClick={check} style={{ marginLeft: 'auto', background: 'none', border: '1px solid #333', borderRadius: 3, color: '#555', fontSize: '0.62rem', padding: '0.1rem 0.4rem', cursor: 'pointer' }}>↻</button>
+      </div>
+      {health?.data && (
+        <>
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.2rem' }}>
+            <span style={{ ...S.mono, fontSize: '0.68rem', color: '#555' }}>db</span>
+            <span style={{ ...S.mono, fontSize: '0.68rem', color: health.data.db === 'ok' ? '#4ade80' : '#f87171' }}>{health.data.db}</span>
+          </div>
+          {health.data.version && (
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.2rem' }}>
+              <span style={{ ...S.mono, fontSize: '0.68rem', color: '#555' }}>version</span>
+              <span style={{ ...S.mono, fontSize: '0.68rem', color: '#888' }}>{health.data.version}</span>
+            </div>
+          )}
+        </>
+      )}
+      {health && !health.ok && (
+        <div style={{ color: '#333', fontSize: '0.72rem', marginTop: '0.3rem' }}>
+          Not reachable — start with <code style={{ background: '#1a1a1a', padding: '0 3px', borderRadius: 2, fontSize: '0.68rem' }}>make dev</code>
+        </div>
+      )}
+      {lastChecked && <div style={{ ...S.mono, fontSize: '0.6rem', color: '#2a2a2a', marginTop: '0.5rem' }}>checked {lastChecked}</div>}
+    </div>
+  )
+}
+
+// ── Security Panel ────────────────────────────────────────────────────────────
+interface SecurityGate { phase: string; done: number; total: number; items: { text: string; done: boolean }[] }
+interface CveEntry { cve: string; suppressed: string; justification: string; added: string }
+
+function parseSecurityGates(content: string): SecurityGate[] {
+  return content.split(/(?=^### Phase)/m).filter(s => s.startsWith('### Phase')).map(section => {
+    const phase = section.split('\n')[0].replace(/^### /, '').trim()
+    const items: { text: string; done: boolean }[] = []
+    for (const line of section.split('\n').slice(1)) {
+      const m = line.match(/^\s*- \[([ x])\] (.+)$/)
+      if (m) items.push({ text: m[2], done: m[1] === 'x' })
+    }
+    return { phase, done: items.filter(i => i.done).length, total: items.length, items }
+  })
+}
+
+function parseCveSuppressions(content: string): CveEntry[] {
+  const m = content.match(/## Acceptable Risk Suppressions[\s\S]*?\| CVE[^\n]*\n\|[^|]+\n([\s\S]*?)(?=\n##|$)/)
+  if (!m) return []
+  return m[1].trim().split('\n').filter(l => l.startsWith('|')).map(row => {
+    const cols = row.split('|').map(c => c.trim()).filter(Boolean)
+    return cols.length >= 4 ? { cve: cols[0], suppressed: cols[1], justification: cols[2], added: cols[3] } : null
+  }).filter(Boolean) as CveEntry[]
+}
+
+function SecurityPanel() {
+  const [content, setContent] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [expanded, setExpanded] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/file?path=docs/agents/SECURITY.md').then(r => r.json())
+      .then(d => { setContent(d.content ?? ''); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [])
+
+  const gates = parseSecurityGates(content)
+  const cves = parseCveSuppressions(content)
+  const totalDone = gates.reduce((s, g) => s + g.done, 0)
+  const totalItems = gates.reduce((s, g) => s + g.total, 0)
+  const activeFindings = content.match(/## Active Findings\s*\n+([\s\S]*?)(?=\n## )/)?.[1]?.trim()
+  const hasFindings = !!activeFindings && !activeFindings.startsWith('_None')
+
+  return (
+    <div style={S.col}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
+        {[
+          { label: 'Gates Complete', value: `${totalDone}/${totalItems}`, color: totalDone === totalItems ? 'green' : 'yellow' },
+          { label: 'Active Findings', value: hasFindings ? '!' : '0', color: hasFindings ? 'red' : 'green' },
+          { label: 'CVE Suppressions', value: cves.length, color: cves.length > 0 ? 'yellow' : 'green' },
+          { label: 'Phase Gates', value: `${gates.filter(g => g.done === g.total && g.total > 0).length}/${gates.length}`, color: 'blue' },
+        ].map(s => (
+          <div key={s.label} style={{ ...S.card, padding: '0.75rem', textAlign: 'center' as const }}>
+            <div style={{ fontSize: '1.3rem', fontWeight: 700, fontFamily: 'monospace', color: s.color === 'green' ? '#4ade80' : s.color === 'red' ? '#f87171' : s.color === 'yellow' ? '#fbbf24' : '#60a5fa' }}>{s.value}</div>
+            <div style={{ fontSize: '0.6rem', color: '#444', textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginTop: '0.2rem' }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+        <div style={S.card}>
+          <div style={S.cardTitle}>Phase Security Gates</div>
+          {loading && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
+          {gates.map(gate => {
+            const pct = gate.total > 0 ? Math.round((gate.done / gate.total) * 100) : 0
+            const allDone = gate.done === gate.total && gate.total > 0
+            const isOpen = expanded === gate.phase
+            return (
+              <div key={gate.phase} style={{ marginBottom: '0.45rem', padding: '0.5rem 0.6rem', background: '#0f0f0f', border: `1px solid ${allDone ? '#166534' : '#1e1e1e'}`, borderRadius: 6 }}>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', cursor: 'pointer' }}
+                  onClick={() => setExpanded(isOpen ? null : gate.phase)}>
+                  <span style={S.badge(allDone ? 'green' : pct > 50 ? 'yellow' : 'grey')}>{pct}%</span>
+                  <span style={{ fontSize: '0.76rem', color: allDone ? '#4ade80' : '#ccc', fontWeight: 600, flex: 1 }}>{gate.phase}</span>
+                  <span style={{ ...S.mono, fontSize: '0.6rem', color: '#444' }}>{gate.done}/{gate.total} {isOpen ? '▲' : '▼'}</span>
+                </div>
+                {isOpen && (
+                  <div style={{ marginTop: '0.4rem', paddingTop: '0.4rem', borderTop: '1px solid #1e1e1e' }}>
+                    {gate.items.map((item, i) => (
+                      <div key={i} style={{ ...S.mono, fontSize: '0.68rem', color: item.done ? '#4ade80' : '#555', marginBottom: '0.18rem' }}>
+                        {item.done ? '✓' : '○'} {item.text}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        <div style={S.col}>
+          {cves.length > 0 && (
+            <div style={S.card}>
+              <div style={S.cardTitle}>CVE Suppressions <span style={S.badge('yellow')}>{cves.length}</span></div>
+              {cves.map((c, i) => (
+                <div key={i} style={{ marginBottom: '0.6rem', paddingBottom: '0.6rem', borderBottom: i < cves.length - 1 ? '1px solid #1a1a1a' : 'none' }}>
+                  <div style={{ ...S.mono, fontSize: '0.7rem', color: '#fbbf24', marginBottom: '0.2rem' }}>{c.cve}</div>
+                  <div style={{ fontSize: '0.72rem', color: '#888', marginBottom: '0.15rem' }}>{c.justification}</div>
+                  <div style={{ ...S.mono, fontSize: '0.6rem', color: '#444' }}>suppressed: {c.suppressed} · added: {c.added}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={S.card}>
+            <div style={S.cardTitle}>
+              Active Findings
+              <span style={S.badge(hasFindings ? 'red' : 'green')}>{hasFindings ? 'OPEN' : 'NONE'}</span>
+            </div>
+            {loading ? <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>
+              : hasFindings ? <MarkdownView content={activeFindings!} maxHeight={320} />
+              : <div style={{ color: '#4ade80', fontSize: '0.8rem' }}>No active security findings.</div>}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Releases Panel ────────────────────────────────────────────────────────────
+interface GHRelease { id: number; tag_name: string; name: string; html_url: string; published_at: string; prerelease: boolean; draft: boolean; body: string }
+
+function ReleasesPanel() {
+  const [releases, setReleases] = useState<GHRelease[]>([])
+  const [loading, setLoading] = useState(true)
+  const [expanded, setExpanded] = useState<number | null>(null)
+
+  useEffect(() => {
+    fetch('/api/github/releases').then(r => r.json())
+      .then(d => { setReleases(Array.isArray(d) ? d : []); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [])
+
+  return (
+    <div style={S.card}>
+      <div style={S.cardTitle}>GitHub Releases <span style={S.badge('blue')}>{releases.length}</span></div>
+      {loading && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
+      {releases.map(rel => {
+        const date = new Date(rel.published_at).toLocaleDateString()
+        const isOpen = expanded === rel.id
+        const tagType = rel.tag_name.includes('hotfix') || (rel.prerelease) ? 'yellow' : 'green'
+        return (
+          <div key={rel.id} style={{ marginBottom: '0.5rem', paddingBottom: '0.5rem', borderBottom: '1px solid #1a1a1a' }}>
+            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', cursor: 'pointer' }}
+              onClick={() => setExpanded(isOpen ? null : rel.id)}>
+              <span style={S.badge(tagType)}>{rel.tag_name}</span>
+              <a href={rel.html_url} target="_blank" rel="noreferrer"
+                style={{ color: '#ccc', textDecoration: 'none', fontSize: '0.76rem', flex: 1 }}
+                onClick={e => e.stopPropagation()}>
+                {rel.name || rel.tag_name}
+              </a>
+              <span style={{ ...S.mono, fontSize: '0.6rem', color: '#444' }}>{date}</span>
+              <span style={{ color: '#444', fontSize: '0.65rem' }}>{isOpen ? '▲' : '▼'}</span>
+            </div>
+            {isOpen && rel.body && (
+              <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #1e1e1e' }}>
+                <MarkdownView content={rel.body} maxHeight={240} />
+              </div>
+            )}
+          </div>
+        )
+      })}
+      {!loading && releases.length === 0 && <div style={{ color: '#444', fontSize: '0.8rem' }}>No releases found.</div>}
+    </div>
+  )
+}
+
 // ── Tab definitions ───────────────────────────────────────────────────────────
-type TabId = 'overview' | 'database' | 'phases' | 'agents' | 'governance' | 'activity' | 'memos' | 'decisions' | 'deployments'
+type TabId = 'overview' | 'database' | 'phases' | 'agents' | 'governance' | 'activity' | 'memos' | 'decisions' | 'deployments' | 'security' | 'issues'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
+  { id: 'issues', label: 'Issues' },
+  { id: 'security', label: 'Security' },
+  { id: 'phases', label: 'Phases' },
+  { id: 'agents', label: 'Agents' },
   { id: 'database', label: 'Database' },
   { id: 'governance', label: 'Governance' },
   { id: 'activity', label: 'Activity' },
-  { id: 'phases', label: 'Phases' },
-  { id: 'agents', label: 'Agents' },
   { id: 'memos', label: 'Memo Center' },
   { id: 'decisions', label: 'Decisions' },
   { id: 'deployments', label: 'Deployments' },
@@ -1629,14 +2039,19 @@ export default function App() {
                 {autoRefresh ? '⏸ Auto-refresh ON (30s)' : '▶ Auto-refresh'}
               </button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0,1fr) minmax(0,1fr)', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0,1fr) minmax(0,1fr) 220px', gap: '1rem' }}>
               <HealthPanel />
               <CIPanel />
               <PRPanel />
+              <BackendHealthWidget />
             </div>
             <IssuesPanel />
           </div>
         )}
+
+        {activeTab === 'issues' && <IssuesTabPanel />}
+
+        {activeTab === 'security' && <SecurityPanel />}
 
         {activeTab === 'database' && <DatabasePanel />}
 
@@ -1652,7 +2067,12 @@ export default function App() {
 
         {activeTab === 'decisions' && <DecisionsPanel />}
 
-        {activeTab === 'deployments' && <DeploymentsPanel />}
+        {activeTab === 'deployments' && (
+          <div style={S.col}>
+            <DeploymentsPanel />
+            <ReleasesPanel />
+          </div>
+        )}
       </div>
     </div>
   )
