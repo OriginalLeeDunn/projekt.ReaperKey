@@ -1,4 +1,4 @@
-# GhostKey API Reference
+KAuthority order for conflict resolution:# GhostKey API Reference
 
 Base URL: configured via `GHOSTKEY__SERVER__HOST` and `GHOSTKEY__SERVER__PORT` (default `http://localhost:8080`)
 

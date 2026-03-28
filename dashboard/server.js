@@ -102,7 +102,8 @@ app.get('/api/phases', (req, res) => {
 })
 
 app.get('/api/deployments', (req, res) => {
-  try { res.json({ content: readFileSync(join(REPO_ROOT, 'docs/agents/DEPLOYMENTS.md'), 'utf-8') }) }
+  // File lives at docs/agents/ops/DEPLOYMENTS.md (not docs/agents/DEPLOYMENTS.md)
+  try { res.json({ content: readFileSync(join(REPO_ROOT, 'docs/agents/ops/DEPLOYMENTS.md'), 'utf-8') }) }
   catch { res.json({ content: '# DEPLOYMENTS\n\nNo deployments recorded yet.' }) }
 })
 
@@ -227,7 +228,11 @@ async function ghFetch(path, res) {
   } catch { res.status(500).json({ error: 'github api error' }) }
 }
 
-app.get('/api/github/issues', (req, res) => ghFetch('/issues?state=open&per_page=20', res))
+app.get('/api/github/issues', (req, res) => {
+  const labels = req.query.labels
+  const qs = labels ? `?state=open&per_page=30&labels=${encodeURIComponent(String(labels))}` : '?state=open&per_page=30'
+  ghFetch(`/issues${qs}`, res)
+})
 app.get('/api/github/runs', (req, res) => ghFetch('/actions/runs?per_page=10', res))
 app.get('/api/github/prs', (req, res) => ghFetch('/pulls?state=open&per_page=20', res))
 
@@ -279,6 +284,95 @@ app.get('/api/activity/agents', (req, res) => {
     }
     res.json(stats)
   } catch { res.json({}) }
+})
+
+// ── GitHub Releases ───────────────────────────────────────────────────────────
+app.get('/api/github/releases', (req, res) => ghFetch('/releases?per_page=20', res))
+
+// ── Backend health-check proxy ────────────────────────────────────────────────
+app.get('/api/healthcheck', async (req, res) => {
+  const port = process.env.BACKEND_PORT || 3001
+  try {
+    const controller = new AbortController()
+    const tid = setTimeout(() => controller.abort(), 3000)
+    const r = await fetch(`http://127.0.0.1:${port}/health`, { signal: controller.signal })
+    clearTimeout(tid)
+    const data = await r.json()
+    res.json({ ok: r.ok, status: r.status, data })
+  } catch {
+    res.json({ ok: false, status: null, data: null })
+  }
+})
+
+// ── Structured HEALTH.md parsers ──────────────────────────────────────────────
+
+function parseMarkdownTable(content, sectionRegex) {
+  const m = content.match(sectionRegex)
+  if (!m) return []
+  return m[1].trim().split('\n')
+    .filter(l => l.startsWith('|') && !l.match(/^[\s|:-]+$/))
+    .map(row => row.split('|').map(c => c.trim()).filter(Boolean))
+    .filter(cols => cols.length >= 2)
+}
+
+app.get('/api/health/gaps', (req, res) => {
+  try {
+    const c = readFileSync(HEALTH_PATH, 'utf-8')
+    const rows = parseMarkdownTable(c, /## Critical Known Gaps[\s\S]*?\| ID[^\n]*\n\|[^|]+\n([\s\S]*?)(?=\n###|\n##|$)/)
+    res.json(rows.map(cols => ({ id: cols[0], area: cols[1], description: cols[2], severity: cols[3], blocks: cols[4] ?? '' })))
+  } catch { res.json([]) }
+})
+
+app.get('/api/health/phases', (req, res) => {
+  try {
+    const c = readFileSync(HEALTH_PATH, 'utf-8')
+    const rows = parseMarkdownTable(c, /## Phase Progress\s*\n\n?\| Phase[^\n]*\n\|[^|]+\n([\s\S]*?)(?=\n###|\n##|$)/)
+    res.json(rows.map(cols => ({ phase: cols[0], status: cols[1], lead: cols[2] ?? '', blocking: cols[3] ?? 'None' })))
+  } catch { res.json([]) }
+})
+
+app.get('/api/health/freshness', (req, res) => {
+  try {
+    const c = readFileSync(HEALTH_PATH, 'utf-8')
+    const rows = parseMarkdownTable(c, /## Document Freshness\s*\n\n?\| Document[^\n]*\n\|[^|]+\n([\s\S]*?)(?=\n---|\n##|$)/)
+    res.json(rows.map(cols => ({ doc: cols[0], lastVerified: cols[1], threshold: cols[2], status: cols[3], nextCheck: cols[4] ?? '' })))
+  } catch { res.json([]) }
+})
+
+app.get('/api/governance/hard-rules', (req, res) => {
+  try {
+    const c = readFileSync(join(REPO_ROOT, 'docs/agents/GOVERNANCE.md'), 'utf-8')
+    const rows = parseMarkdownTable(c, /## Hard Rules[\s\S]*?\| #[^\n]*\n\|[^|]+\n([\s\S]*?)(?=\n\*\*Rule|\n\n[^|]|$)/)
+    res.json(rows.map(cols => ({ number: cols[0], rule: cols[1], enforcedBy: cols[2] ?? '' })))
+  } catch { res.json([]) }
+})
+
+// Structured DECISIONS.md parser — returns decision entries as JSON
+app.get('/api/decisions/structured', (req, res) => {
+  try {
+    const c = readFileSync(join(REPO_ROOT, 'docs/agents/DECISIONS.md'), 'utf-8')
+    const blocks = c.split(/^## /m).filter(b => b.match(/^\d{4}-\d{2}-\d{2}/))
+    const decisions = blocks.map(block => {
+      const firstLine = block.split('\n')[0]
+      const dateMatch = firstLine.match(/^(\d{4}-\d{2}-\d{2})/)
+      const agentMatch = firstLine.match(/^\d{4}-\d{2}-\d{2} — ([^—\n]+)/)
+      const titleMatch = firstLine.match(/^\d{4}-\d{2}-\d{2} — [^—]+— (.+)/)
+      const phaseMatch = block.match(/\*\*Phase:\*\*\s*([^\n]+)/)
+      const statusMatch = block.match(/\*\*Status:\*\*\s*([^\n]+)/)
+      const reviewsMatch = block.match(/\*\*Reviewed by:\*\*\s*([^\n]+)/)
+      const body = block.split('\n').slice(1).join('\n').trim()
+      return {
+        date: dateMatch?.[1] ?? '',
+        agent: agentMatch?.[1]?.trim() ?? '',
+        title: titleMatch?.[1]?.trim() ?? firstLine.trim(),
+        phase: phaseMatch?.[1]?.trim() ?? '',
+        status: statusMatch?.[1]?.trim() ?? 'Accepted',
+        reviews: reviewsMatch?.[1]?.trim() ?? '',
+        body,
+      }
+    })
+    res.json(decisions)
+  } catch { res.json([]) }
 })
 
 // ── SSE — Live Activity Stream ────────────────────────────────────────────────
