@@ -176,21 +176,57 @@ function CIPanel() {
 }
 
 // ── PRs Panel ─────────────────────────────────────────────────────────────────
-interface GHPr { number: number; title: string; html_url: string; head: { ref: string }; base: { ref: string }; labels: { name: string }[]; created_at: string; draft: boolean }
+interface GHPr { number: number; title: string; html_url: string; head: { ref: string; sha: string }; base: { ref: string }; labels: { name: string }[]; created_at: string; draft: boolean }
+interface CheckRun { name: string; conclusion: string | null; status: string }
 
 function PRPanel() {
   const [prs, setPrs] = useState<GHPr[]>([])
   const [loading, setLoading] = useState(true)
+  const [checks, setChecks] = useState<Record<number, CheckRun[]>>({})
+  const [merging, setMerging] = useState<number | null>(null)
+  const [mergedNums, setMergedNums] = useState<number[]>([])
+
+  const loadChecks = useCallback(async (prList: GHPr[]) => {
+    const results: Record<number, CheckRun[]> = {}
+    await Promise.all(prList.map(async pr => {
+      try {
+        const d = await fetch(`/api/github/pr/${pr.number}/checks`).then(r => r.json())
+        results[pr.number] = Array.isArray(d.check_runs) ? d.check_runs : []
+      } catch { results[pr.number] = [] }
+    }))
+    setChecks(results)
+  }, [])
 
   const load = useCallback(() => {
     setLoading(true)
     fetch('/api/github/prs')
       .then(r => r.json())
-      .then(d => { setPrs(Array.isArray(d) ? d : []); setLoading(false) })
+      .then(d => {
+        const list = Array.isArray(d) ? d : []
+        setPrs(list); setLoading(false); loadChecks(list)
+      })
       .catch(() => setLoading(false))
-  }, [])
+  }, [loadChecks])
 
   useEffect(() => { load() }, [load])
+
+  async function mergePr(pr: GHPr) {
+    setMerging(pr.number)
+    try {
+      const r = await fetch(`/api/github/pr/${pr.number}/merge`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ merge_method: 'merge' }) })
+      if (r.ok) { setMergedNums(m => [...m, pr.number]); setTimeout(load, 1500) }
+    } finally { setMerging(null) }
+  }
+
+  function prCheckSummary(prNum: number) {
+    const runs = checks[prNum]
+    if (!runs) return null
+    const total = runs.length
+    const passed = runs.filter(c => c.conclusion === 'success' || c.conclusion === 'skipped').length
+    const failed = runs.filter(c => c.conclusion === 'failure' || c.conclusion === 'cancelled').length
+    const allGreen = total > 0 && failed === 0 && runs.every(c => c.status === 'completed')
+    return { total, passed, failed, allGreen }
+  }
 
   return (
     <div style={S.card}>
@@ -201,19 +237,41 @@ function PRPanel() {
       </div>
       {loading && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
       {!loading && prs.length === 0 && <div style={{ color: '#4ade80', fontSize: '0.8rem' }}>No open PRs</div>}
-      {prs.map(pr => (
-        <div key={pr.number} style={{ marginBottom: '0.6rem', paddingBottom: '0.6rem', borderBottom: '1px solid #1a1a1a' }}>
-          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginBottom: '0.2rem' }}>
-            {pr.draft && <span style={S.badge('grey')}>draft</span>}
-            <a href={pr.html_url} target="_blank" rel="noreferrer" style={{ color: '#60a5fa', textDecoration: 'none', fontSize: '0.78rem' }}>
-              #{pr.number} {pr.title}
-            </a>
+      {prs.map(pr => {
+        const summary = prCheckSummary(pr.number)
+        const canMerge = summary?.allGreen && pr.base.ref === 'dev' && !mergedNums.includes(pr.number) && !pr.draft
+        return (
+          <div key={pr.number} style={{ marginBottom: '0.6rem', paddingBottom: '0.6rem', borderBottom: '1px solid #1a1a1a' }}>
+            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginBottom: '0.25rem', flexWrap: 'wrap' as const }}>
+              {pr.draft && <span style={S.badge('grey')}>draft</span>}
+              <a href={pr.html_url} target="_blank" rel="noreferrer"
+                style={{ color: '#60a5fa', textDecoration: 'none', fontSize: '0.78rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
+                #{pr.number} {pr.title}
+              </a>
+              {summary && (
+                <span style={S.badge(summary.failed > 0 ? 'red' : summary.allGreen ? 'green' : 'yellow')}>
+                  {summary.passed}/{summary.total} CI
+                </span>
+              )}
+              {!summary && checks[pr.number] === undefined && (
+                <span style={{ ...S.mono, fontSize: '0.6rem', color: '#333' }}>checking...</span>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <span style={{ ...S.mono, fontSize: '0.65rem', color: '#444', flex: 1 }}>
+                {pr.head.ref} → {pr.base.ref}
+              </span>
+              {mergedNums.includes(pr.number) && <span style={S.badge('green')}>merged ✓</span>}
+              {canMerge && (
+                <button onClick={() => mergePr(pr)} disabled={merging === pr.number}
+                  style={{ ...S.btn(merging === pr.number, 'success'), fontSize: '0.62rem', padding: '0.15rem 0.6rem' }}>
+                  {merging === pr.number ? 'Merging…' : '⇡ Merge'}
+                </button>
+              )}
+            </div>
           </div>
-          <div style={{ ...S.mono, fontSize: '0.65rem', color: '#444' }}>
-            {pr.head.ref} → {pr.base.ref}
-          </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -293,10 +351,28 @@ const LAYER_COLOR: Record<string, string> = {
   Sec: '#dc2626', Audit: '#d97706', Ops: '#0891b2',
 }
 
+interface AgentStat { count: number; last: string | null; lastAction: string | null }
+
+function timeAgo(iso: string | null): string {
+  if (!iso) return '—'
+  const diff = Date.now() - new Date(iso).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  return `${Math.floor(h / 24)}d ago`
+}
+
 function RosterPanel() {
   const [selected, setSelected] = useState<string | null>(null)
   const [agentDoc, setAgentDoc] = useState<string | null>(null)
   const [loadingDoc, setLoadingDoc] = useState(false)
+  const [agentStats, setAgentStats] = useState<Record<string, AgentStat>>({})
+
+  useEffect(() => {
+    fetch('/api/activity/agents').then(r => r.json()).then(setAgentStats).catch(() => {})
+  }, [])
 
   const selectAgent = useCallback((agent: typeof ROSTER[0]) => {
     if (selected === agent.name) { setSelected(null); setAgentDoc(null); return }
@@ -309,28 +385,68 @@ function RosterPanel() {
   }, [selected])
 
   const layers = [...new Set(ROSTER.map(a => a.layer))]
+  const totalActions = Object.values(agentStats).reduce((s, v) => s + v.count, 0)
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '1rem' }}>
-      <div style={S.card}>
-        <div style={S.cardTitle}>Agent Roster <span style={S.badge('green')}>{ROSTER.length}</span></div>
-        {layers.map(layer => (
-          <div key={layer} style={{ marginBottom: '0.7rem' }}>
-            <div style={{ fontSize: '0.6rem', color: LAYER_COLOR[layer], fontWeight: 700, marginBottom: '0.3rem', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{layer}</div>
-            {ROSTER.filter(a => a.layer === layer).map(a => (
-              <button key={a.name} onClick={() => selectAgent(a)}
-                style={{ display: 'block', width: '100%', textAlign: 'left' as const, background: selected === a.name ? '#1a2030' : 'none', border: `1px solid ${selected === a.name ? '#1d4ed8' : 'transparent'}`, borderRadius: 4, padding: '0.2rem 0.4rem', fontSize: '0.72rem', color: selected === a.name ? '#93c5fd' : '#888', cursor: 'pointer', marginBottom: '0.15rem' }}>
-                {a.name}
-              </button>
-            ))}
+    <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '1rem' }}>
+      <div style={S.col}>
+        <div style={S.card}>
+          <div style={S.cardTitle}>
+            Agent Roster <span style={S.badge('green')}>{ROSTER.length}</span>
+            {totalActions > 0 && <span style={{ ...S.mono, marginLeft: 'auto', fontSize: '0.62rem', color: '#444' }}>{totalActions} events</span>}
           </div>
-        ))}
+          {layers.map(layer => (
+            <div key={layer} style={{ marginBottom: '0.7rem' }}>
+              <div style={{ fontSize: '0.6rem', color: LAYER_COLOR[layer], fontWeight: 700, marginBottom: '0.3rem', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{layer}</div>
+              {ROSTER.filter(a => a.layer === layer).map(a => {
+                const stat = agentStats[a.name]
+                return (
+                  <button key={a.name} onClick={() => selectAgent(a)}
+                    style={{ display: 'flex', width: '100%', textAlign: 'left' as const, alignItems: 'center', background: selected === a.name ? '#1a2030' : 'none', border: `1px solid ${selected === a.name ? '#1d4ed8' : 'transparent'}`, borderRadius: 4, padding: '0.2rem 0.5rem', fontSize: '0.72rem', color: selected === a.name ? '#93c5fd' : '#888', cursor: 'pointer', marginBottom: '0.15rem', gap: '0.4rem' }}>
+                    <span style={{ flex: 1 }}>{a.name}</span>
+                    {stat && (
+                      <>
+                        <span style={{ fontSize: '0.6rem', color: '#555', fontFamily: 'monospace' }}>{stat.count}</span>
+                        <span style={{ fontSize: '0.58rem', color: '#3a3a3a', fontFamily: 'monospace' }}>{timeAgo(stat.last)}</span>
+                      </>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          ))}
+        </div>
       </div>
       <div style={S.card}>
-        <div style={S.cardTitle}>{selected ?? 'Select an agent'}</div>
-        {!selected && <div style={{ color: '#555', fontSize: '0.82rem' }}>Click an agent to view its role file.</div>}
-        {loadingDoc && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
-        {agentDoc && !loadingDoc && <MarkdownView content={agentDoc} maxHeight={580} />}
+        {!selected && (
+          <>
+            <div style={S.cardTitle}>Agent Activity Summary</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.5rem' }}>
+              {ROSTER.map(a => {
+                const stat = agentStats[a.name]
+                if (!stat) return null
+                return (
+                  <div key={a.name} onClick={() => selectAgent(a)}
+                    style={{ background: '#0f0f0f', border: '1px solid #1e1e1e', borderRadius: 6, padding: '0.5rem 0.7rem', cursor: 'pointer' }}>
+                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginBottom: '0.2rem' }}>
+                      <span style={{ fontSize: '0.72rem', color: agentColor(a.name), fontWeight: 600 }}>{a.name}</span>
+                      <span style={{ ...S.badge('blue'), marginLeft: 'auto' }}>{stat.count}</span>
+                    </div>
+                    <div style={{ ...S.mono, fontSize: '0.62rem', color: '#444' }}>{stat.lastAction}</div>
+                    <div style={{ ...S.mono, fontSize: '0.58rem', color: '#333', marginTop: '0.15rem' }}>{timeAgo(stat.last)}</div>
+                  </div>
+                )
+              }).filter(Boolean)}
+              {Object.keys(agentStats).length === 0 && (
+                <div style={{ color: '#333', fontSize: '0.8rem' }}>No activity logged yet.</div>
+              )}
+            </div>
+            <div style={{ ...S.mono, fontSize: '0.65rem', color: '#2a2a2a', marginTop: '0.75rem' }}>Click an agent to view its role file.</div>
+          </>
+        )}
+        {selected && <div style={S.cardTitle}>{selected}</div>}
+        {selected && loadingDoc && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
+        {selected && agentDoc && !loadingDoc && <MarkdownView content={agentDoc} maxHeight={580} />}
       </div>
     </div>
   )
@@ -449,6 +565,7 @@ function MemoCenterPanel() {
   const [inboxLoading, setInboxLoading] = useState(true)
   const [outboxLoading, setOutboxLoading] = useState(true)
   const [activeView, setActiveView] = useState<'inbox' | 'outbox'>('inbox')
+  const [inboxSearch, setInboxSearch] = useState('')
 
   const loadInbox = useCallback(() => {
     setInboxLoading(true)
@@ -471,6 +588,11 @@ function MemoCenterPanel() {
       else setSendStatus('error')
     } catch { setSendStatus('error') }
   }
+
+  const pendingCount = (inbox.match(/\*\*Status:\*\* PENDING/g) ?? []).length
+  const filteredInbox = inboxSearch.trim()
+    ? inbox.split(/(?=### MEMO-)/).filter(b => b.toLowerCase().includes(inboxSearch.toLowerCase())).join('')
+    : inbox
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '1rem' }}>
@@ -498,12 +620,20 @@ function MemoCenterPanel() {
       </div>
       <div style={S.card}>
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', alignItems: 'center' }}>
-          <button onClick={() => setActiveView('inbox')} style={S.tab(activeView === 'inbox')}>INBOX</button>
+          <button onClick={() => setActiveView('inbox')} style={S.tab(activeView === 'inbox')}>
+            INBOX{pendingCount > 0 ? ` (${pendingCount})` : ''}
+          </button>
           <button onClick={() => setActiveView('outbox')} style={S.tab(activeView === 'outbox')}>OUTBOX</button>
           <button style={{ ...S.btn(), marginLeft: 'auto', padding: '0.3rem 0.7rem', fontSize: '0.7rem' }}
             onClick={() => { activeView === 'inbox' ? loadInbox() : loadOutbox() }}>Refresh</button>
         </div>
-        {activeView === 'inbox' && (inboxLoading ? <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div> : <MarkdownView content={inbox} maxHeight={520} />)}
+        {activeView === 'inbox' && (
+          <>
+            <input style={{ ...S.input, marginBottom: '0.6rem' }} placeholder="Search inbox…" value={inboxSearch} onChange={e => setInboxSearch(e.target.value)} />
+            {inboxLoading ? <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div> : <MarkdownView content={filteredInbox} maxHeight={480} />}
+            {!inboxLoading && inboxSearch && !filteredInbox.trim() && <div style={{ color: '#555', fontSize: '0.8rem' }}>No memos match.</div>}
+          </>
+        )}
         {activeView === 'outbox' && (outboxLoading ? <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div> : <MarkdownView content={outbox} maxHeight={520} />)}
       </div>
     </div>
@@ -523,41 +653,140 @@ function DecisionsPanel() {
   const entries = content.split(/(?=^### DEC-)/m).filter(s => s.startsWith('### DEC-'))
   const filtered = filter ? entries.filter(e => e.toLowerCase().includes(filter.toLowerCase())) : entries
 
+  const dates = entries.map(e => e.match(/(\d{4}-\d{2}-\d{2})/)?.[1]).filter(Boolean) as string[]
+  const latestDate = dates.sort().reverse()[0]
+  const thisWeek = dates.filter(d => {
+    const ms = Date.now() - new Date(d).getTime()
+    return ms < 7 * 24 * 60 * 60 * 1000
+  }).length
+
   return (
-    <div style={S.card}>
-      <div style={S.cardTitle}>Decision Log <span style={S.badge('blue')}>{entries.length} decisions</span></div>
-      <input style={{ ...S.input, marginBottom: '0.75rem' }} placeholder="Filter decisions..." value={filter} onChange={e => setFilter(e.target.value)} />
-      {loading && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
-      {!loading && filtered.length === 0 && <div style={{ color: '#444', fontSize: '0.8rem' }}>No decisions found.</div>}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: 600, overflow: 'auto' }}>
-        {[...filtered].reverse().map((entry, i) => {
-          const titleLine = entry.split('\n')[0].replace('### ', '')
-          const rest = entry.split('\n').slice(1).join('\n').trim()
-          return (
-            <div key={i} style={{ background: '#0f0f0f', border: '1px solid #1e1e1e', borderRadius: 6, padding: '0.6rem 0.75rem' }}>
-              <div style={{ fontSize: '0.78rem', color: '#93c5fd', fontWeight: 600, marginBottom: '0.3rem' }}>{titleLine}</div>
-              <MarkdownView content={rest} maxHeight={180} />
-            </div>
-          )
-        })}
+    <div style={S.col}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
+        {[
+          { label: 'Total Decisions', value: entries.length, color: 'blue' },
+          { label: 'This Week', value: thisWeek, color: thisWeek > 0 ? 'yellow' : 'grey' },
+          { label: 'Latest', value: latestDate ?? '—', color: 'green' },
+        ].map(stat => (
+          <div key={stat.label} style={{ ...S.card, padding: '0.75rem', textAlign: 'center' as const }}>
+            <div style={{ fontSize: '1.3rem', fontWeight: 700, color: stat.color === 'blue' ? '#60a5fa' : stat.color === 'yellow' ? '#fbbf24' : stat.color === 'green' ? '#4ade80' : '#555', fontFamily: 'monospace' }}>{stat.value}</div>
+            <div style={{ fontSize: '0.6rem', color: '#444', textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginTop: '0.2rem' }}>{stat.label}</div>
+          </div>
+        ))}
+      </div>
+      <div style={S.card}>
+        <div style={S.cardTitle}>Decision Log <span style={S.badge('blue')}>{filtered.length}/{entries.length}</span></div>
+        <input style={{ ...S.input, marginBottom: '0.75rem' }} placeholder="Filter decisions..." value={filter} onChange={e => setFilter(e.target.value)} />
+        {loading && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
+        {!loading && filtered.length === 0 && <div style={{ color: '#444', fontSize: '0.8rem' }}>No decisions found.</div>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: 560, overflow: 'auto' }}>
+          {[...filtered].reverse().map((entry, i) => {
+            const titleLine = entry.split('\n')[0].replace('### ', '')
+            const rest = entry.split('\n').slice(1).join('\n').trim()
+            const dateMatch = titleLine.match(/\d{4}-\d{2}-\d{2}/)
+            return (
+              <div key={i} style={{ background: '#0f0f0f', border: '1px solid #1e1e1e', borderRadius: 6, padding: '0.6rem 0.75rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'baseline', marginBottom: '0.3rem' }}>
+                  <span style={{ fontSize: '0.78rem', color: '#93c5fd', fontWeight: 600 }}>{titleLine}</span>
+                  {dateMatch && <span style={{ ...S.mono, fontSize: '0.6rem', color: '#333', marginLeft: 'auto', whiteSpace: 'nowrap' as const }}>{dateMatch[0]}</span>}
+                </div>
+                <MarkdownView content={rest} maxHeight={180} />
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )
 }
 
 // ── Deployments Panel ─────────────────────────────────────────────────────────
+interface DeployEntry { title: string; date: string | null; env: string; status: string; body: string }
+
+function parseDeployments(content: string): DeployEntry[] {
+  const blocks = content.split(/(?=^#{1,3} )/m).filter(b => b.trim())
+  return blocks.map(block => {
+    const firstLine = block.split('\n')[0].replace(/^#+\s*/, '')
+    const body = block.split('\n').slice(1).join('\n').trim()
+    const dateMatch = firstLine.match(/(\d{4}-\d{2}-\d{2})/)
+    const lower = (firstLine + ' ' + body).toLowerCase()
+    const env =
+      lower.includes('mainnet') ? 'mainnet' :
+      lower.includes('prod') ? 'prod' :
+      lower.includes('staging') ? 'staging' :
+      lower.includes('sepolia') || lower.includes('testnet') ? 'testnet' :
+      lower.includes('local') || lower.includes('dev') ? 'dev' : 'unknown'
+    const status =
+      lower.includes('failed') || lower.includes('rollback') ? 'failed' :
+      lower.includes('success') || lower.includes('deployed') || lower.includes('live') ? 'success' :
+      lower.includes('pending') || lower.includes('in progress') ? 'pending' : 'info'
+    return { title: firstLine, date: dateMatch?.[1] ?? null, env, status, body }
+  })
+}
+
+const ENV_COLOR: Record<string, string> = {
+  mainnet: 'red', prod: 'red', staging: 'yellow', testnet: 'blue', dev: 'grey', unknown: 'grey',
+}
+
 function DeploymentsPanel() {
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(true)
+  const [envFilter, setEnvFilter] = useState('All')
 
   useEffect(() => {
     fetch('/api/deployments').then(r => r.json()).then(d => { setContent(d.content); setLoading(false) }).catch(() => setLoading(false))
   }, [])
 
+  const deploys = parseDeployments(content)
+  const envs = ['All', ...new Set(deploys.map(d => d.env))]
+  const filtered = envFilter === 'All' ? deploys : deploys.filter(d => d.env === envFilter)
+  const counts = { success: deploys.filter(d => d.status === 'success').length, failed: deploys.filter(d => d.status === 'failed').length }
+
   return (
-    <div style={S.card}>
-      <div style={S.cardTitle}>Deployment History</div>
-      {loading ? <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div> : <MarkdownView content={content} maxHeight={600} />}
+    <div style={S.col}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
+        {[
+          { label: 'Total', value: deploys.length, color: 'blue' },
+          { label: 'Successful', value: counts.success, color: 'green' },
+          { label: 'Failed', value: counts.failed, color: counts.failed > 0 ? 'red' : 'grey' },
+          { label: 'Environments', value: envs.length - 1, color: 'purple' },
+        ].map(stat => (
+          <div key={stat.label} style={{ ...S.card, padding: '0.75rem', textAlign: 'center' as const }}>
+            <div style={{ fontSize: '1.3rem', fontWeight: 700, fontFamily: 'monospace', color: stat.color === 'green' ? '#4ade80' : stat.color === 'red' ? '#f87171' : stat.color === 'blue' ? '#60a5fa' : stat.color === 'purple' ? '#c084fc' : '#555' }}>{stat.value}</div>
+            <div style={{ fontSize: '0.6rem', color: '#444', textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginTop: '0.2rem' }}>{stat.label}</div>
+          </div>
+        ))}
+      </div>
+      <div style={S.card}>
+        <div style={S.cardTitle}>
+          Deployment History
+          <div style={{ display: 'flex', gap: '0.3rem', marginLeft: 'auto' }}>
+            {envs.map(e => (
+              <button key={e} onClick={() => setEnvFilter(e)}
+                style={{ ...S.btn(false, envFilter === e ? undefined : 'ghost'), fontSize: '0.6rem', padding: '0.1rem 0.4rem' }}>
+                {e}
+              </button>
+            ))}
+          </div>
+        </div>
+        {loading && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
+        {!loading && deploys.length === 0 && <MarkdownView content={content} maxHeight={560} />}
+        {!loading && deploys.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: 560, overflow: 'auto' }}>
+            {[...filtered].reverse().map((d, i) => (
+              <div key={i} style={{ background: '#0f0f0f', border: '1px solid #1e1e1e', borderRadius: 6, padding: '0.6rem 0.75rem' }}>
+                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginBottom: '0.3rem', flexWrap: 'wrap' as const }}>
+                  <span style={S.badge(ENV_COLOR[d.env] ?? 'grey')}>{d.env}</span>
+                  <span style={S.badge(d.status === 'success' ? 'green' : d.status === 'failed' ? 'red' : d.status === 'pending' ? 'yellow' : 'grey')}>{d.status}</span>
+                  <span style={{ fontSize: '0.78rem', color: '#ccc', fontWeight: 600 }}>{d.title}</span>
+                  {d.date && <span style={{ ...S.mono, fontSize: '0.62rem', color: '#333', marginLeft: 'auto' }}>{d.date}</span>}
+                </div>
+                {d.body && <MarkdownView content={d.body} maxHeight={160} />}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -577,6 +806,8 @@ function DatabasePanel() {
   const [sql, setSql] = useState('SELECT * FROM users LIMIT 20')
   const [queryResult, setQueryResult] = useState<{ rows: Record<string, unknown>[]; columns: string[]; error?: string } | null>(null)
   const [queryLoading, setQueryLoading] = useState(false)
+  const [sortCol, setSortCol] = useState<string | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
   useEffect(() => {
     fetch('/api/db/status').then(r => r.json()).then(s => {
@@ -590,6 +821,7 @@ function DatabasePanel() {
   const loadTable = useCallback((name: string, p = 0) => {
     setTableLoading(true)
     setQueryMode(false)
+    setSortCol(null)
     fetch(`/api/db/table/${name}?page=${p}`)
       .then(r => r.json())
       .then(d => { setTableData(d); setTableLoading(false) })
@@ -605,6 +837,7 @@ function DatabasePanel() {
   async function runQuery() {
     setQueryLoading(true)
     setQueryMode(true)
+    setSortCol(null)
     try {
       const r = await fetch('/api/db/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sql }) })
       const d = await r.json()
@@ -613,8 +846,35 @@ function DatabasePanel() {
     setQueryLoading(false)
   }
 
+  function toggleSort(col: string) {
+    if (sortCol === col) { setSortDir(d => d === 'asc' ? 'desc' : 'asc') }
+    else { setSortCol(col); setSortDir('asc') }
+  }
+
+  function exportCsv() {
+    if (!displayData?.rows?.length) return
+    const cols = displayData.columns
+    const header = cols.map(c => JSON.stringify(c)).join(',')
+    const body = displayData.rows.map(r => cols.map(c => JSON.stringify(r[c] ?? '')).join(','))
+    const csv = [header, ...body].join('\n')
+    const a = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })),
+      download: `${selectedTable ?? 'query'}.csv`,
+    })
+    a.click(); URL.revokeObjectURL(a.href)
+  }
+
   const displayData = queryMode ? queryResult : tableData
   const totalPages = tableData && !queryMode ? Math.ceil(tableData.total / tableData.limit) : 0
+
+  const sortedRows = (() => {
+    const rows = displayData?.rows ?? []
+    if (!sortCol) return rows
+    return [...rows].sort((a, b) => {
+      const va = String(a[sortCol] ?? ''), vb = String(b[sortCol] ?? '')
+      return sortDir === 'asc' ? va.localeCompare(vb, undefined, { numeric: true }) : vb.localeCompare(va, undefined, { numeric: true })
+    })
+  })()
 
   if (!dbStatus) return <div style={S.card}><div style={{ color: '#444', fontSize: '0.8rem' }}>Connecting to database...</div></div>
   if (!dbStatus.available) return (
@@ -670,12 +930,24 @@ function DatabasePanel() {
         {/* Table header */}
         {!queryMode && selectedTable && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-            <div style={S.cardTitle}>{selectedTable}</div>
+            <div style={{ ...S.cardTitle, marginBottom: 0 }}>{selectedTable}</div>
             <span style={{ ...S.mono, fontSize: '0.65rem', color: '#555' }}>{tableData?.total?.toLocaleString()} rows</span>
             <button onClick={() => loadTable(selectedTable, page)}
-              style={{ marginLeft: 'auto', background: 'none', border: '1px solid #333', borderRadius: 3, color: '#555', fontSize: '0.62rem', padding: '0.1rem 0.4rem', cursor: 'pointer' }}>↻</button>
+              style={{ background: 'none', border: '1px solid #333', borderRadius: 3, color: '#555', fontSize: '0.62rem', padding: '0.1rem 0.4rem', cursor: 'pointer' }}>↻</button>
+            {displayData?.rows?.length ? (
+              <button onClick={exportCsv} style={{ ...S.btn(false, 'ghost'), fontSize: '0.62rem', padding: '0.1rem 0.5rem', marginLeft: 'auto' }}>
+                ↓ CSV
+              </button>
+            ) : null}
           </div>
         )}
+
+        {/* CSV export for query results */}
+        {queryMode && displayData?.rows?.length ? (
+          <button onClick={exportCsv} style={{ ...S.btn(false, 'ghost'), fontSize: '0.62rem', padding: '0.1rem 0.5rem', marginBottom: '0.5rem' }}>
+            ↓ Export CSV
+          </button>
+        ) : null}
 
         {/* Data table */}
         {(tableLoading || queryLoading) && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
@@ -686,12 +958,16 @@ function DatabasePanel() {
               <thead>
                 <tr>
                   {displayData.columns.map(col => (
-                    <th key={col} style={S.tableHead}>{col}</th>
+                    <th key={col} style={{ ...S.tableHead, cursor: 'pointer', userSelect: 'none' as const }}
+                      onClick={() => toggleSort(col)}>
+                      {col}
+                      {sortCol === col ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ' ·'}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {displayData.rows.map((row, i) => (
+                {sortedRows.map((row, i) => (
                   <tr key={i} style={{ background: i % 2 === 0 ? '#111' : '#141414' }}>
                     {displayData.columns.map(col => (
                       <td key={col} style={{ ...S.tableCell, color: row[col] === null ? '#444' : '#ccc' }}
@@ -1311,6 +1587,17 @@ function Clock() {
 // ── Main App ──────────────────────────────────────────────────────────────────
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>('overview')
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [overviewKey, setOverviewKey] = useState(0)
+  const autoRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    clearInterval(autoRefreshRef.current!)
+    if (autoRefresh) {
+      autoRefreshRef.current = setInterval(() => setOverviewKey(k => k + 1), 30000)
+    }
+    return () => clearInterval(autoRefreshRef.current!)
+  }, [autoRefresh])
 
   return (
     <div style={S.page}>
@@ -1319,7 +1606,9 @@ export default function App() {
           <div style={S.headerTitle}>GhostKey — Agent Operations Dashboard</div>
           <div style={S.headerSub}>DB Viewer · Governance · Activity · Memo Center · CI · Phase Tracker</div>
         </div>
-        <div style={{ fontSize: '0.68rem', color: '#333' }}><Clock /></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ fontSize: '0.68rem', color: '#333' }}><Clock /></div>
+        </div>
       </div>
 
       <div style={S.tabBar}>
@@ -1332,7 +1621,14 @@ export default function App() {
 
       <div style={S.body}>
         {activeTab === 'overview' && (
-          <div style={S.col}>
+          <div key={overviewKey} style={S.col}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '-0.25rem' }}>
+              <button
+                onClick={() => setAutoRefresh(a => !a)}
+                style={{ ...S.btn(false, autoRefresh ? 'success' : 'ghost'), fontSize: '0.62rem', padding: '0.2rem 0.6rem' }}>
+                {autoRefresh ? '⏸ Auto-refresh ON (30s)' : '▶ Auto-refresh'}
+              </button>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0,1fr) minmax(0,1fr)', gap: '1rem' }}>
               <HealthPanel />
               <CIPanel />

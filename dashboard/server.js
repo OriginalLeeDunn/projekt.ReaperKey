@@ -230,7 +230,56 @@ async function ghFetch(path, res) {
 app.get('/api/github/issues', (req, res) => ghFetch('/issues?state=open&per_page=20', res))
 app.get('/api/github/runs', (req, res) => ghFetch('/actions/runs?per_page=10', res))
 app.get('/api/github/prs', (req, res) => ghFetch('/pulls?state=open&per_page=20', res))
-app.get('/api/github/pr/:number/checks', (req, res) => ghFetch(`/commits/${req.params.number}/check-runs`, res))
+
+// Fetch check-runs for a PR by its PR number (resolves head SHA first)
+app.get('/api/github/pr/:number/checks', async (req, res) => {
+  try {
+    const token = process.env.GITHUB_TOKEN
+    const headers = { 'User-Agent': 'ghostkey-dashboard', ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+    const base = 'https://api.github.com/repos/OriginalLeeDunn/projekt.ReaperKey'
+    const prRes = await fetch(`${base}/pulls/${req.params.number}`, { headers })
+    const pr = await prRes.json()
+    if (!pr.head?.sha) return res.json({ check_runs: [] })
+    const r = await fetch(`${base}/commits/${pr.head.sha}/check-runs?per_page=50`, { headers })
+    res.json(await r.json())
+  } catch { res.status(500).json({ error: 'github api error' }) }
+})
+
+// Merge a PR into its base branch
+app.post('/api/github/pr/:number/merge', async (req, res) => {
+  const token = process.env.GITHUB_TOKEN
+  if (!token) return res.status(403).json({ error: 'GITHUB_TOKEN not set' })
+  const { merge_method = 'merge' } = req.body ?? {}
+  try {
+    const headers = { 'User-Agent': 'ghostkey-dashboard', Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+    const r = await fetch(`https://api.github.com/repos/OriginalLeeDunn/projekt.ReaperKey/pulls/${req.params.number}/merge`, {
+      method: 'PUT', headers, body: JSON.stringify({ merge_method }),
+    })
+    res.status(r.status).json(await r.json())
+  } catch (e) { res.status(500).json({ error: String(e) }) }
+})
+
+// Per-agent activity stats derived from ACTIVITY.log
+app.get('/api/activity/agents', (req, res) => {
+  try {
+    if (!existsSync(ACTIVITY_LOG)) return res.json({})
+    const lines = readFileSync(ACTIVITY_LOG, 'utf-8').trim().split('\n').filter(Boolean)
+    const stats = {}
+    for (const line of lines) {
+      try {
+        const e = JSON.parse(line)
+        if (!e.agent) continue
+        if (!stats[e.agent]) stats[e.agent] = { count: 0, last: null, lastAction: null }
+        stats[e.agent].count++
+        if (!stats[e.agent].last || e.ts > stats[e.agent].last) {
+          stats[e.agent].last = e.ts
+          stats[e.agent].lastAction = e.action
+        }
+      } catch { /* skip malformed lines */ }
+    }
+    res.json(stats)
+  } catch { res.json({}) }
+})
 
 // ── SSE — Live Activity Stream ────────────────────────────────────────────────
 // Clients connect to /api/stream/activity and receive new log entries in real-time
