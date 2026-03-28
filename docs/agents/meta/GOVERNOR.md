@@ -78,13 +78,35 @@ For each claim in [doc]:
 
 ## What Governor Produces
 
-| Output                    | Location         | When                          |
-|---------------------------|------------------|-------------------------------|
-| Freshness flags           | `HEALTH.md`      | Weekly + on stale detection   |
-| Drift findings            | `HEALTH.md`      | Weekly + on divergence found  |
-| Self-assessment report    | `HEALTH.md`      | Weekly                        |
-| Evolution decisions       | `DECISIONS.md`   | When roster changes           |
-| Updated AGENTS.md         | `AGENTS.md`      | When roster changes           |
+| Output                    | Location              | When                          |
+|---------------------------|-----------------------|-------------------------------|
+| Freshness flags           | `HEALTH.md`           | Weekly + on stale detection   |
+| Drift findings            | `HEALTH.md`           | Weekly + on divergence found  |
+| Self-assessment report    | `HEALTH.md`           | Weekly                        |
+| Evolution decisions       | `DECISIONS.md`        | When roster changes           |
+| Updated AGENTS.md         | `AGENTS.md`           | When roster changes           |
+| Run activity entries      | `ACTIVITY.log`        | Every governor session        |
+
+## Activity Log Protocol
+
+Governor **must** write a JSON entry to `docs/agents/ACTIVITY.log` at the start and end of every run.
+
+**Start-of-run entry:**
+```json
+{"ts": "<ISO8601>", "event_type": "agent", "agent": "Governor", "action": "Governor run start", "detail": "<trigger reason>", "status": "ok"}
+```
+
+**Per-finding entry (one per drift finding or freshness flag):**
+```json
+{"ts": "<ISO8601>", "event_type": "agent", "agent": "Governor", "action": "<Doc Currency|Drift Detection|CI Check|PR Check>", "detail": "<finding summary>", "status": "<ok|warn|error>"}
+```
+
+**End-of-run entry:**
+```json
+{"ts": "<ISO8601>", "event_type": "agent", "agent": "Governor", "action": "Governor run complete", "detail": "<N issues, N checks, overall status>", "status": "<ok|warn|error>"}
+```
+
+Entries are appended one per line. Never overwrite — always append.
 
 ---
 
