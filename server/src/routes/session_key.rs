@@ -3,6 +3,7 @@ use chrono::{TimeZone, Utc};
 use uuid::Uuid;
 
 use crate::{
+    activity::ActivityEntry,
     error::{AppError, AppResult},
     middleware::AuthUser,
     models::session::{IssueSessionKeyRequest, SessionKeyResponse},
@@ -74,6 +75,19 @@ pub async fn issue(
         .unwrap_or_else(Utc::now);
 
     tracing::info!(session_id = %session_id, account_id = %body.account_id, expires_at = %expires_at_dt, "session_key.issued");
+    state.activity.emit(
+        ActivityEntry::backend(
+            "session_key.issued",
+            format!("session key issued, expires {expires_at_dt}"),
+            "ok",
+        )
+        .with_user(auth.user_id)
+        .with_meta(serde_json::json!({
+            "session_id": session_id,
+            "account_id": body.account_id,
+            "ttl_seconds": body.ttl_seconds,
+        })),
+    );
 
     // SPEC-020: return session_id + key_hash (echoed) + expires_at — NOT the raw session key
     Ok((

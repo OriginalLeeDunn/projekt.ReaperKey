@@ -4,6 +4,7 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::{
+    activity::ActivityEntry,
     error::{AppError, AppResult},
     routes::AppState,
 };
@@ -52,6 +53,10 @@ pub async fn init(
     .await?;
 
     tracing::info!(recovery_id = %recovery_id, account_id = %account_id, "recovery.init");
+    state.activity.emit(
+        ActivityEntry::backend("recovery.initiated", "social recovery initiated", "ok")
+            .with_meta(serde_json::json!({ "recovery_id": recovery_id, "account_id": account_id })),
+    );
 
     // SPEC-040: recovery must NOT grant server key access (non-custodial constraint)
     Ok((

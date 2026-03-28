@@ -1,6 +1,6 @@
 # ReaperKey (GhostKey)
 
-> Non-custodial Web3 wallet abstraction SDK. Rust backend · TypeScript SDK · ERC-4337 smart accounts on Base.
+> Non-custodial Web3 wallet abstraction SDK. Rust backend · TypeScript SDK · ERC-4337 smart accounts on Base, Arbitrum, and Ethereum.
 
 [![CI](https://github.com/OriginalLeeDunn/projekt.ReaperKey/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/OriginalLeeDunn/projekt.ReaperKey/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@ghostkey/sdk)](https://www.npmjs.com/package/@ghostkey/sdk)
@@ -13,9 +13,10 @@ ReaperKey lets apps give users smart contract wallets (ERC-4337) without ever to
 
 - **Non-custodial** — server never sees private keys. Ever.
 - **Session keys** — scoped, time-limited permissions for dApp interactions
-- **Intent routing** — client builds + signs UserOperations, server validates scope and submits to Pimlico
-- **Base chain** — ERC-4337 via ZeroDev Kernel v3, bundled by Pimlico
-- **Self-hostable** — single Rust binary + SQLite
+- **Intent routing** — client builds + signs UserOperations via `sendIntentWithSessionKey`; server validates scope and submits to Pimlico
+- **Multi-chain** — Base (default), Arbitrum, and Ethereum; add chains via config with zero code changes
+- **PostgreSQL or SQLite** — SQLite for local dev, Postgres for production
+- **Self-hostable** — single Rust binary, no managed infra required
 
 ---
 
@@ -39,7 +40,7 @@ ReaperKey lets apps give users smart contract wallets (ERC-4337) without ever to
 └─────────────────┬───────────────────────────────────┘
                   │ JSON-RPC
 ┌─────────────────▼───────────────────────────────────┐
-│  Base Chain (ERC-4337)                               │
+│  Base / Arbitrum / Ethereum (ERC-4337)               │
 │  EntryPoint v0.7 · ZeroDev Kernel v3 · Pimlico       │
 └─────────────────────────────────────────────────────┘
 ```
@@ -76,6 +77,9 @@ cp config.toml.example config.toml
 # Required: set jwt_secret (min 32 chars) and Pimlico API key in config.toml
 # Or export as env vars: JWT_SECRET=... BASE_BUNDLER_URL=... BASE_PAYMASTER_URL=...
 
+# Run DB migrations (creates db/ghostkey.db)
+make migrate
+
 # Start server
 make dev
 ```
@@ -106,22 +110,26 @@ make ci          # everything (same as CI pipeline)
 ## Project Structure
 
 ```
-├── server/          # Rust backend (Axum + SQLite + sqlx)
+├── server/          # Rust backend (Axum + SQLite/Postgres + sqlx)
 │   ├── src/
-│   │   ├── routes/  # auth, account, session_key, intent, recovery
-│   │   ├── models/  # DB row types + request/response types
+│   │   ├── routes/      # auth, account, session_key, intent, recovery
+│   │   ├── models/      # DB row types + request/response types
 │   │   ├── middleware/  # JWT auth extractor + rate limiter
-│   │   └── chain.rs    # Pimlico bundler adapter
-│   ├── migrations/  # SQLite schema
-│   └── tests/       # Integration tests (auth, account, security)
-├── sdk/             # TypeScript SDK
+│   │   └── chain.rs     # Pimlico bundler adapter (multi-chain)
+│   ├── migrations/      # SQLite schema
+│   ├── migrations_pg/   # PostgreSQL-compatible migrations
+│   └── tests/           # Integration tests (auth, account, security, e2e)
+├── sdk/             # TypeScript SDK (@ghostkey/sdk)
 │   └── src/
 │       ├── client.ts       # API client
-│       ├── hooks/          # useLogin, useAccount, useSendIntent
+│       ├── hooks/          # useLogin, useAccount, useSessionKey, useSendIntent
+│       ├── userop.ts       # buildUserOperation (GAP-001)
 │       └── provider.tsx    # React context provider
+├── db/              # SQLite database directory (db/.gitkeep tracked; *.db gitignored)
+├── example/         # Reference React app (full 4-step flow)
+├── dashboard/       # Agent operations dashboard
 ├── docs/agents/     # AI agent governance system
 │   ├── AGENTS.md    # Master orchestration doc (read first)
-│   ├── STACK.md     # Full stack diagram
 │   └── ...
 └── .github/workflows/ci.yml
 ```
@@ -134,6 +142,7 @@ make ci          # everything (same as CI pipeline)
 |--------|------|------|-------------|
 | POST | `/auth/login` | — | Login / register (email) |
 | POST | `/auth/refresh` | JWT | Refresh JWT token |
+| POST | `/auth/logout` | JWT | Logout — invalidates token via denylist |
 | POST | `/account/create` | JWT | Create ERC-4337 smart account |
 | GET | `/account/:id` | JWT | Fetch account details |
 | POST | `/session-key/issue` | JWT | Issue scoped session key |
