@@ -318,7 +318,7 @@ function parseMarkdownTable(content, sectionRegex) {
 app.get('/api/health/gaps', (req, res) => {
   try {
     const c = readFileSync(HEALTH_PATH, 'utf-8')
-    const rows = parseMarkdownTable(c, /## Critical Known Gaps[\s\S]*?\| ID[^\n]*\n\|[^|]+\n([\s\S]*?)(?=\n###|\n##|$)/)
+    const rows = parseMarkdownTable(c, /## Critical Known Gaps[\s\S]*?\| ID[^\n]*\n\|[^\n]+\n([\s\S]*?)(?=\n###|\n##|$)/)
     res.json(rows.map(cols => ({ id: cols[0], area: cols[1], description: cols[2], severity: cols[3], blocks: cols[4] ?? '' })))
   } catch { res.json([]) }
 })
@@ -326,7 +326,7 @@ app.get('/api/health/gaps', (req, res) => {
 app.get('/api/health/phases', (req, res) => {
   try {
     const c = readFileSync(HEALTH_PATH, 'utf-8')
-    const rows = parseMarkdownTable(c, /## Phase Progress\s*\n\n?\| Phase[^\n]*\n\|[^|]+\n([\s\S]*?)(?=\n###|\n##|$)/)
+    const rows = parseMarkdownTable(c, /## Phase Progress\s*\n\n?\| Phase[^\n]*\n\|[^\n]+\n([\s\S]*?)(?=\n###|\n##|$)/)
     res.json(rows.map(cols => ({ phase: cols[0], status: cols[1], lead: cols[2] ?? '', blocking: cols[3] ?? 'None' })))
   } catch { res.json([]) }
 })
@@ -334,7 +334,7 @@ app.get('/api/health/phases', (req, res) => {
 app.get('/api/health/freshness', (req, res) => {
   try {
     const c = readFileSync(HEALTH_PATH, 'utf-8')
-    const rows = parseMarkdownTable(c, /## Document Freshness\s*\n\n?\| Document[^\n]*\n\|[^|]+\n([\s\S]*?)(?=\n---|\n##|$)/)
+    const rows = parseMarkdownTable(c, /## Document Freshness\s*\n\n?\| Document[^\n]*\n\|[^\n]+\n([\s\S]*?)(?=\n---|\n##|$)/)
     res.json(rows.map(cols => ({ doc: cols[0], lastVerified: cols[1], threshold: cols[2], status: cols[3], nextCheck: cols[4] ?? '' })))
   } catch { res.json([]) }
 })
@@ -342,7 +342,7 @@ app.get('/api/health/freshness', (req, res) => {
 app.get('/api/governance/hard-rules', (req, res) => {
   try {
     const c = readFileSync(join(REPO_ROOT, 'docs/agents/GOVERNANCE.md'), 'utf-8')
-    const rows = parseMarkdownTable(c, /## Hard Rules[\s\S]*?\| #[^\n]*\n\|[^|]+\n([\s\S]*?)(?=\n\*\*Rule|\n\n[^|]|$)/)
+    const rows = parseMarkdownTable(c, /## Hard Rules[\s\S]*?\| #[^\n]*\n\|[^\n]+\n([\s\S]*?)(?=\n\*\*Rule|\n\n[^|]|$)/)
     res.json(rows.map(cols => ({ number: cols[0], rule: cols[1], enforcedBy: cols[2] ?? '' })))
   } catch { res.json([]) }
 })
@@ -405,13 +405,13 @@ function broadcast(entry) {
 }
 
 // Ensure ACTIVITY.log exists so watchers and GET /api/activity always work
-if (!existsSync(ACTIVITY_LOG)) {
+if (process.env.NODE_ENV !== 'test' && !existsSync(ACTIVITY_LOG)) {
   appendFileSync(ACTIVITY_LOG, '')
 }
 
 // Watch ACTIVITY.log for new appended lines and broadcast to all SSE clients.
 // Backend (Rust) and Claude tool hooks write here directly; this picks them up.
-let lastLogSize = readFileSync(ACTIVITY_LOG).length
+let lastLogSize = existsSync(ACTIVITY_LOG) ? readFileSync(ACTIVITY_LOG).length : 0
 
 function broadcastNewEntries() {
   if (!existsSync(ACTIVITY_LOG)) return
@@ -497,18 +497,64 @@ function onHealthChange(delta) {
   })
 }
 
-// Single watcher on docs/agents/ directory catches top-level file changes.
-// Node's fs.watch is non-recursive so subdir changes are caught separately.
-watch(join(REPO_ROOT, 'docs/agents'), { persistent: false }, (event, filename) => {
-  if (filename === 'ACTIVITY.log') return broadcastNewEntries()
-  if (filename === 'INBOX.md') return handleDocChange(INBOX_PATH, 'inbox', onInboxChange)
-  if (filename === 'OUTBOX.md') return handleDocChange(OUTBOX_PATH, 'outbox', onOutboxChange)
-  if (filename === 'DECISIONS.md') return handleDocChange(DECISIONS_PATH, 'decisions', onDecisionsChange)
-  if (filename === 'HEALTH.md') return handleDocChange(HEALTH_PATH, 'health', onHealthChange)
-})
+// ── CI Poller — synthesise ci entries from GitHub Actions runs ─────────────
+// GitHub Actions can't reach localhost:3003, so we poll from the server side
+// every 5 minutes and write a ci entry for each newly-completed run.
+const seenRunIds = new Set()
 
-// Watch docs/agents/ACTIVITY.log directly to also catch Rust backend writes
-// (which go directly to the file, bypassing the directory watcher sometimes)
-watch(ACTIVITY_LOG, { persistent: false }, () => broadcastNewEntries())
+async function pollCIRuns() {
+  try {
+    const token = process.env.GITHUB_TOKEN
+    if (!token) return
+    const headers = { 'User-Agent': 'ghostkey-dashboard', Authorization: `Bearer ${token}` }
+    const r = await fetch('https://api.github.com/repos/OriginalLeeDunn/projekt.ReaperKey/actions/runs?per_page=20', { headers })
+    if (!r.ok) return
+    const { workflow_runs: runs } = await r.json()
+    if (!Array.isArray(runs)) return
 
-app.listen(3003, () => console.log('Dashboard API server running on :3003'))
+    for (const run of runs) {
+      if (seenRunIds.has(run.id)) continue
+      seenRunIds.add(run.id)
+      if (run.status !== 'completed') continue  // only log finished runs
+      const conclusion = run.conclusion ?? 'unknown'
+      const status = conclusion === 'success' ? 'ok' : conclusion === 'failure' ? 'error' : 'warn'
+      const detail = `${run.name} — ${run.head_branch} — ${conclusion} (#${run.run_number})`
+      appendActivity({ event_type: 'ci', agent: 'CI', action: 'workflow_run', detail, status,
+        meta: { run_id: run.id, conclusion, branch: run.head_branch, workflow: run.name, url: run.html_url } })
+    }
+  } catch { /* silent — poller should never crash the server */ }
+}
+
+// Seed seen IDs from existing ci entries so we don't re-log runs from before startup
+try {
+  if (existsSync(ACTIVITY_LOG)) {
+    const lines = readFileSync(ACTIVITY_LOG, 'utf-8').trim().split('\n').filter(Boolean)
+    for (const line of lines) {
+      try { const e = JSON.parse(line); if (e.event_type === 'ci' && e.meta?.run_id) seenRunIds.add(e.meta.run_id) } catch { /* skip */ }
+    }
+  }
+} catch { /* skip */ }
+
+// ── Startup side-effects — skipped in test ────────────────────────────────
+if (process.env.NODE_ENV !== 'test') {
+  watch(join(REPO_ROOT, 'docs/agents'), { persistent: false }, (event, filename) => {
+    if (filename === 'ACTIVITY.log') return broadcastNewEntries()
+    if (filename === 'INBOX.md') return handleDocChange(INBOX_PATH, 'inbox', onInboxChange)
+    if (filename === 'OUTBOX.md') return handleDocChange(OUTBOX_PATH, 'outbox', onOutboxChange)
+    if (filename === 'DECISIONS.md') return handleDocChange(DECISIONS_PATH, 'decisions', onDecisionsChange)
+    if (filename === 'HEALTH.md') return handleDocChange(HEALTH_PATH, 'health', onHealthChange)
+  })
+  watch(ACTIVITY_LOG, { persistent: false }, () => broadcastNewEntries())
+  pollCIRuns()
+  setInterval(pollCIRuns, 5 * 60 * 1000)
+  app.listen(3003, () => console.log('Dashboard API server running on :3003'))
+}
+
+export { app }
+
+// Internal functions exported only in test mode for unit testing
+export const _test = process.env.NODE_ENV === 'test'
+  ? { appendActivity, broadcastNewEntries, handleDocChange, makeEntry,
+      onInboxChange, onOutboxChange, onDecisionsChange, onHealthChange,
+      pollCIRuns, parseMarkdownTable, seenRunIds }
+  : {}
