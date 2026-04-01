@@ -132,6 +132,126 @@ function HealthPanel() {
   )
 }
 
+// ── Health Tab Panel ──────────────────────────────────────────────────────────
+interface AssessmentEntry { date: string; agent: string; title: string; body: string }
+
+function parseSelfAssessmentLog(content: string): AssessmentEntry[] {
+  const m = content.match(/## Self-Assessment Log([\s\S]*)$/)
+  if (!m) return []
+  return m[1].split(/\n---\n/).map(block => {
+    const heading = block.match(/###\s+(.+)/)?.[1]?.trim() ?? ''
+    const date = heading.match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? ''
+    const agent = heading.match(/^\d{4}-\d{2}-\d{2} — ([^—\n]+)/)?.[1]?.trim() ?? ''
+    const title = heading.match(/^\d{4}-\d{2}-\d{2} — [^—]+ — (.+)/)?.[1]?.trim() ?? heading
+    const body = block.replace(/^[\s\S]*?###[^\n]*\n/, '').trim()
+    return { date, agent, title, body }
+  }).filter(e => e.date)
+}
+
+function HealthTabPanel() {
+  const [content, setContent] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [phases, setPhases] = useState<{ phase: string; status: string; lead: string; blocking: string }[]>([])
+  const [gaps, setGaps] = useState<GapRow[]>([])
+  const [logExpanded, setLogExpanded] = useState<number | null>(null)
+
+  useEffect(() => {
+    fetch('/api/file?path=docs/agents/HEALTH.md').then(r => r.json()).then(d => { setContent(d.content ?? null); setLoading(false) }).catch(() => setLoading(false))
+    fetch('/api/health/phases').then(r => r.json()).then(d => setPhases(Array.isArray(d) ? d : [])).catch(() => {})
+    fetch('/api/health/gaps').then(r => r.json()).then(d => setGaps(Array.isArray(d) ? d : [])).catch(() => {})
+  }, [])
+
+  const overall = content?.match(/OVERALL: (.+)/)?.[1] ?? 'UNKNOWN'
+  const openIssues = content?.match(/OPEN ISSUES:\s+(.+)/)?.[1] ?? '?'
+  const testsStr = content?.match(/TESTS PASSING:\s+(.+)/)?.[1] ?? '?'
+  const coverage = content?.match(/COVERAGE:\s+(.+)/)?.[1] ?? '?'
+  const isHealthy = overall.includes('HEALTHY') && !overall.includes('CRITICAL')
+  const assessments = content ? parseSelfAssessmentLog(content) : []
+
+  return (
+    <div style={S.col}>
+      {/* Summary row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
+        {[
+          { label: 'Overall', value: overall, color: isHealthy ? 'green' : 'red' },
+          { label: 'Open Issues', value: openIssues, color: openIssues === '0' ? 'green' : 'yellow' },
+          { label: 'Tests', value: testsStr, color: 'blue' },
+          { label: 'Coverage', value: coverage, color: 'purple' },
+        ].map(stat => (
+          <div key={stat.label} style={{ ...S.card, padding: '0.75rem', textAlign: 'center' as const }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, fontFamily: 'monospace', color: stat.color === 'green' ? '#4ade80' : stat.color === 'red' ? '#f87171' : stat.color === 'blue' ? '#60a5fa' : stat.color === 'yellow' ? '#fbbf24' : '#c084fc', wordBreak: 'break-all' as const }}>{stat.value}</div>
+            <div style={{ fontSize: '0.6rem', color: '#444', textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginTop: '0.2rem' }}>{stat.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Phase progress + gaps */}
+      <div style={S.grid2}>
+        <div style={S.card}>
+          <div style={S.cardTitle}>Phase Progress</div>
+          {loading && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
+          {phases.map((p, i) => (
+            <div key={i} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.35rem' }}>
+              <span style={S.badge(p.status.toLowerCase().includes('complete') ? 'green' : p.status.toLowerCase().includes('progress') ? 'blue' : 'grey')}>{p.status}</span>
+              <span style={{ fontSize: '0.75rem', color: '#ccc', flex: 1 }}>{p.phase}</span>
+              {p.lead && <span style={{ ...S.mono, fontSize: '0.62rem', color: '#555' }}>{p.lead}</span>}
+            </div>
+          ))}
+          {!loading && phases.length === 0 && <div style={{ color: '#444', fontSize: '0.8rem' }}>No phase data.</div>}
+        </div>
+        <div style={S.card}>
+          <div style={S.cardTitle}>
+            Critical Gaps
+            <span style={S.badge(gaps.length > 0 ? 'red' : 'green')}>{gaps.length}</span>
+          </div>
+          {gaps.length === 0 && <div style={{ color: '#444', fontSize: '0.8rem' }}>No critical gaps.</div>}
+          {gaps.map((gap, i) => (
+            <div key={i} style={{ marginBottom: '0.5rem', paddingBottom: '0.5rem', borderBottom: '1px solid #1a1a1a' }}>
+              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginBottom: '0.2rem', flexWrap: 'wrap' as const }}>
+                <span style={S.badge('red')}>{gap.id}</span>
+                {gap.severity && <span style={S.badge('yellow')}>{gap.severity}</span>}
+                <span style={{ fontSize: '0.72rem', color: '#888' }}>{gap.area}</span>
+              </div>
+              <div style={{ fontSize: '0.72rem', color: '#f87171' }}>{gap.description}</div>
+              {gap.blocks && <div style={{ fontSize: '0.65rem', color: '#555', marginTop: '0.1rem' }}>Blocks: {gap.blocks}</div>}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Self-Assessment Log */}
+      <div style={S.card}>
+        <div style={S.cardTitle}>
+          Self-Assessment Log
+          <span style={S.badge('blue')}>{assessments.length}</span>
+          <span style={{ ...S.mono, fontSize: '0.62rem', color: '#333', marginLeft: 'auto' }}>newest first</span>
+        </div>
+        {loading && <div style={{ color: '#444', fontSize: '0.8rem' }}>Loading...</div>}
+        {!loading && assessments.length === 0 && <div style={{ color: '#444', fontSize: '0.8rem' }}>No assessment entries found.</div>}
+        <div style={{ maxHeight: 620, overflow: 'auto' }}>
+          {[...assessments].reverse().map((entry, i) => (
+            <div key={i} style={{ borderBottom: '1px solid #1a1a1a', paddingBottom: '0.5rem', marginBottom: '0.5rem' }}>
+              <div
+                style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', cursor: 'pointer', flexWrap: 'wrap' as const }}
+                onClick={() => setLogExpanded(logExpanded === i ? null : i)}>
+                <span style={S.badge('blue')}>{entry.date}</span>
+                <span style={{ ...S.mono, fontSize: '0.68rem', color: '#7c3aed' }}>{entry.agent}</span>
+                <span style={{ fontSize: '0.75rem', color: '#ccc', flex: 1 }}>{entry.title}</span>
+                <span style={{ ...S.mono, fontSize: '0.62rem', color: '#333' }}>{logExpanded === i ? '▲' : '▼'}</span>
+              </div>
+              {logExpanded === i && (
+                <div style={{ marginTop: '0.5rem', paddingLeft: '0.5rem', borderLeft: '2px solid #1e3a5f' }}>
+                  <MarkdownView content={entry.body} maxHeight={360} />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── CI Panel ──────────────────────────────────────────────────────────────────
 interface WorkflowRun { id: number; name: string; conclusion: string | null; status: string; html_url: string; created_at: string; head_branch: string }
 
@@ -425,7 +545,6 @@ const ROSTER = [
   { name: 'Drift Detector', layer: 'Meta', file: 'agents/meta/DRIFT_DETECTOR.md' },
   { name: 'Evolution Planner', layer: 'Meta', file: 'agents/meta/EVOLUTION.md' },
   { name: 'Inbox Agent', layer: 'Meta', file: 'agents/meta/INBOX.md' },
-  { name: 'Dashboard Agent', layer: 'Meta', file: 'agents/meta/DASHBOARD.md' },
   { name: 'Orchestrator', layer: 'Exec', file: 'agents/corp/ORCHESTRATOR.md' },
   { name: 'Architect', layer: 'Exec', file: 'agents/corp/ARCHITECT.md' },
   { name: 'Backend Engineer', layer: 'Eng', file: 'agents/engineering/BACKEND.md' },
@@ -552,6 +671,10 @@ function PhasesPanel() {
   const [phases, setPhases] = useState<Phase[]>([])
   const [loading, setLoading] = useState(true)
   const [gaps, setGaps] = useState<GapRow[]>([])
+  const [mission, setMission] = useState<string | null>(null)
+  const [protocol, setProtocol] = useState<string | null>(null)
+  const [constraints, setConstraints] = useState<string | null>(null)
+  const [contextOpen, setContextOpen] = useState<'mission' | 'protocol' | 'constraints' | null>(null)
 
   useEffect(() => {
     fetch('/api/health/gaps').then(r => r.json()).then(d => setGaps(Array.isArray(d) ? d : [])).catch(() => {})
@@ -559,6 +682,17 @@ function PhasesPanel() {
       .then(r => r.json())
       .then(({ content }) => {
         if (!content) { setLoading(false); return }
+
+        // Parse context sections from ORCHESTRATOR.md
+        const sections = content.split(/^## /m)
+        const extract = (heading: string) =>
+          sections.find(s => s.startsWith(heading))
+            ?.split('\n').slice(1).join('\n').split(/^---$/m)[0].trim() ?? null
+        setMission(extract('Mission'))
+        setProtocol(extract('Decision Protocol'))
+        setConstraints(extract('Constraints'))
+
+        // Parse phase checklist
         const parsed: Phase[] = []
         const lines = content.split('\n')
         let inChecklist = false
@@ -639,22 +773,48 @@ function PhasesPanel() {
         {!loading && phases.length === 0 && <div style={{ color: '#444', fontSize: '0.8rem' }}>Could not parse phase data.</div>}
       </div>
 
-      {/* Known gaps sidebar */}
-      <div style={S.card}>
-        <div style={S.cardTitle}>
-          Known Gaps
-          <span style={S.badge(gaps.length > 0 ? 'red' : 'green')}>{gaps.length}</span>
-        </div>
-        {gaps.length === 0 && <div style={{ color: '#444', fontSize: '0.8rem' }}>No critical gaps.</div>}
-        {gaps.map((gap, i) => (
-          <div key={i} style={{ marginBottom: '0.6rem', paddingBottom: '0.6rem', borderBottom: '1px solid #1a1a1a' }}>
-            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginBottom: '0.2rem', flexWrap: 'wrap' as const }}>
-              <span style={S.badge('red')}>{gap.id}</span>
-              {gap.severity && <span style={S.badge('yellow')}>{gap.severity}</span>}
-              <span style={{ fontSize: '0.72rem', color: '#888' }}>{gap.area}</span>
+      {/* Right column: gaps + orchestrator context */}
+      <div style={S.col}>
+        <div style={S.card}>
+          <div style={S.cardTitle}>
+            Known Gaps
+            <span style={S.badge(gaps.length > 0 ? 'red' : 'green')}>{gaps.length}</span>
+          </div>
+          {gaps.length === 0 && <div style={{ color: '#444', fontSize: '0.8rem' }}>No critical gaps.</div>}
+          {gaps.map((gap, i) => (
+            <div key={i} style={{ marginBottom: '0.6rem', paddingBottom: '0.6rem', borderBottom: '1px solid #1a1a1a' }}>
+              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginBottom: '0.2rem', flexWrap: 'wrap' as const }}>
+                <span style={S.badge('red')}>{gap.id}</span>
+                {gap.severity && <span style={S.badge('yellow')}>{gap.severity}</span>}
+                <span style={{ fontSize: '0.72rem', color: '#888' }}>{gap.area}</span>
+              </div>
+              <div style={{ fontSize: '0.75rem', color: '#f87171', marginBottom: '0.15rem' }}>{gap.description}</div>
+              {gap.blocks && <div style={{ fontSize: '0.65rem', color: '#555' }}>Blocks: {gap.blocks}</div>}
             </div>
-            <div style={{ fontSize: '0.75rem', color: '#f87171', marginBottom: '0.15rem' }}>{gap.description}</div>
-            {gap.blocks && <div style={{ fontSize: '0.65rem', color: '#555' }}>Blocks: {gap.blocks}</div>}
+          ))}
+        </div>
+
+        {/* Orchestrator context cards */}
+        {([
+          { key: 'mission' as const, label: 'Mission', text: mission },
+          { key: 'protocol' as const, label: 'Decision Protocol', text: protocol },
+          { key: 'constraints' as const, label: 'Constraints', text: constraints },
+        ] as const).filter(c => c.text).map(({ key, label, text }) => (
+          <div key={key} style={S.card}>
+            <div style={S.cardTitle}>
+              {label}
+              <button
+                onClick={() => setContextOpen(contextOpen === key ? null : key)}
+                style={{ ...S.btn(false, 'ghost'), marginLeft: 'auto', fontSize: '0.65rem', padding: '0.1rem 0.4rem' }}>
+                {contextOpen === key ? '▲' : '▼'}
+              </button>
+            </div>
+            {contextOpen !== key && (
+              <div style={{ ...S.mono, fontSize: '0.68rem', color: '#444', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                {text!.split('\n').find(l => l.trim()) ?? ''}
+              </div>
+            )}
+            {contextOpen === key && <MarkdownView content={text!} maxHeight={220} />}
           </div>
         ))}
       </div>
@@ -831,6 +991,27 @@ function DecisionsPanel() {
 }
 
 // ── Deployments Panel ─────────────────────────────────────────────────────────
+function parseProductionState(content: string): { key: string; value: string }[] {
+  const m = content.match(/## Current Production State[\s\S]*?```([^`]+)```/)
+  if (!m) return []
+  return m[1].trim().split('\n')
+    .filter(l => l.includes(':'))
+    .map(l => { const idx = l.indexOf(':'); return { key: l.slice(0, idx).trim(), value: l.slice(idx + 1).trim() } })
+    .filter(r => r.key && r.value)
+}
+
+function parseDevBranchState(content: string): { item: string; status: string; notes: string }[] {
+  const m = content.match(/## Current dev Branch State[\s\S]*?\| Item[^\n]*\n\|[^\n]+\n([\s\S]*?)(?=\n---|\n##|$)/)
+  if (!m) return []
+  return m[1].trim().split('\n')
+    .filter(l => l.startsWith('|') && !l.match(/^[\s|:-]+$/))
+    .map(row => {
+      const cols = row.split('|').map(c => c.trim()).filter(Boolean)
+      return cols.length >= 2 ? { item: cols[0], status: cols[1], notes: cols[2] ?? '' } : null
+    })
+    .filter(Boolean) as { item: string; status: string; notes: string }[]
+}
+
 const ENV_COLOR: Record<string, string> = {
   mainnet: 'red', prod: 'red', staging: 'yellow', testnet: 'blue', dev: 'grey', unknown: 'grey',
 }
@@ -839,9 +1020,17 @@ function DeploymentsPanel() {
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(true)
   const [envFilter, setEnvFilter] = useState('All')
+  const [prodState, setProdState] = useState<{ key: string; value: string }[]>([])
+  const [devState, setDevState] = useState<{ item: string; status: string; notes: string }[]>([])
+  const [stateView, setStateView] = useState<'prod' | 'dev'>('prod')
 
   useEffect(() => {
-    fetch('/api/deployments').then(r => r.json()).then(d => { setContent(d.content); setLoading(false) }).catch(() => setLoading(false))
+    fetch('/api/deployments').then(r => r.json()).then(d => {
+      setContent(d.content)
+      setProdState(parseProductionState(d.content))
+      setDevState(parseDevBranchState(d.content))
+      setLoading(false)
+    }).catch(() => setLoading(false))
   }, [])
 
   const deploys = parseDeployments(content)
@@ -851,6 +1040,53 @@ function DeploymentsPanel() {
 
   return (
     <div style={S.col}>
+      {(prodState.length > 0 || devState.length > 0) && (
+        <div style={S.card}>
+          <div style={S.cardTitle}>
+            Current State
+            <div style={{ display: 'flex', gap: '0.3rem', marginLeft: 'auto' }}>
+              {(['prod', 'dev'] as const).map(v => (
+                <button key={v} onClick={() => setStateView(v)}
+                  style={{ ...S.btn(false, stateView === v ? undefined : 'ghost'), fontSize: '0.6rem', padding: '0.1rem 0.4rem' }}>
+                  {v === 'prod' ? 'Production' : 'Dev Branch'}
+                </button>
+              ))}
+            </div>
+          </div>
+          {stateView === 'prod' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,2fr)', gap: '0.2rem 0.75rem' }}>
+              {prodState.map(({ key, value }) => (
+                <React.Fragment key={key}>
+                  <div style={{ ...S.mono, fontSize: '0.68rem', color: '#444', paddingTop: '0.25rem' }}>{key}</div>
+                  <div style={{ fontSize: '0.72rem', color: '#ccc', paddingTop: '0.25rem', whiteSpace: 'pre-wrap' as const }}>{value}</div>
+                </React.Fragment>
+              ))}
+            </div>
+          )}
+          {stateView === 'dev' && devState.length > 0 && (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  {['Item', 'Status', 'Notes'].map(h => <th key={h} style={S.tableHead}>{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {devState.map((row, i) => (
+                  <tr key={i}>
+                    <td style={S.tableCell}>{row.item}</td>
+                    <td style={S.tableCell}>
+                      <span style={S.badge(row.status.startsWith('✓') ? 'green' : row.status.startsWith('✗') ? 'red' : 'yellow')}>
+                        {row.status}
+                      </span>
+                    </td>
+                    <td style={{ ...S.tableCell, maxWidth: 360, whiteSpace: 'normal' as const, color: '#666' }}>{row.notes}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
         {[
           { label: 'Total', value: deploys.length, color: 'blue' },
@@ -1922,10 +2158,11 @@ function ReleasesPanel() {
 }
 
 // ── Tab definitions ───────────────────────────────────────────────────────────
-type TabId = 'overview' | 'database' | 'phases' | 'agents' | 'governance' | 'activity' | 'memos' | 'decisions' | 'deployments' | 'security' | 'issues'
+type TabId = 'overview' | 'database' | 'phases' | 'agents' | 'governance' | 'activity' | 'memos' | 'decisions' | 'deployments' | 'security' | 'issues' | 'health'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
+  { id: 'health', label: 'Health' },
   { id: 'issues', label: 'Issues' },
   { id: 'security', label: 'Security' },
   { id: 'phases', label: 'Phases' },
@@ -2000,6 +2237,8 @@ export default function App() {
             <IssuesPanel />
           </div>
         )}
+
+        {activeTab === 'health' && <HealthTabPanel />}
 
         {activeTab === 'issues' && <IssuesTabPanel />}
 
