@@ -116,7 +116,17 @@ jobs:
         run: npm run build
 
       - name: Publish
-        run: npm publish --access public || echo "Version already published, skipping."
+        shell: bash
+        run: |
+          set -o pipefail
+          if npm publish --access public 2>&1 | tee /tmp/npm-publish.log; then
+            echo "Published."
+          elif grep -qi "cannot publish over" /tmp/npm-publish.log; then
+            echo "Version already published, skipping."
+          else
+            echo "::error::npm publish failed for a reason other than 'already published' (see log above) — check NPM_TOKEN validity/scope before re-running."
+            exit 1
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
