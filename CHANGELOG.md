@@ -23,7 +23,13 @@ _Nothing unreleased yet._
 - Added `sdk/README.md` covering install, quick start, and hook overview for the npm package page.
 - `sdk/package.json`: added `license`, `author`, `repository`, `homepage`, `bugs`, `keywords`.
 
-No functional/API changes.
+### Security
+- CI hadn't run in ~5 months; new advisories published since then were blocking every PR. Fixed the ones fixable without breaking changes:
+  - Rust: `cargo update -p quinn-proto -p rustls-webpki` — clears RUSTSEC-2026-0185, -0098, -0099, -0104 (patch-level, no API impact).
+  - SDK: `npm audit fix` — clears the `ws` (via `viem`), `brace-expansion`, `form-data`, `js-yaml`, `nanoid`, `postcss` advisories. This bumped `viem` to `2.55.18`, which required updating the `ox` override from `0.14.7` to `0.14.33` (viem's actual `ox` dependency) — the stale pin was causing a `SyntaxError` in `ox/tempo` at test time.
+  - CI's SDK audit step now runs `npm audit --omit=dev` — the one remaining moderate/high/critical chain (`esbuild`/`vite`/`vitest`) is entirely inside `devDependencies` (test tooling, never shipped to consumers) and only clears with a breaking `vitest` v1→v4 migration, tracked separately rather than forced in here.
+
+No functional/API changes to the SDK's public surface.
 
 ---
 
