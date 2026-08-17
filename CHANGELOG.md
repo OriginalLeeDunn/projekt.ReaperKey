@@ -15,6 +15,18 @@ _Nothing unreleased yet._
 
 ---
 
+## [1.0.1] — 2026-08-17 — SDK npm listing fix
+
+### Fixed
+- `@ghostkey/sdk` npm listing was missing a `license` field, README, `repository`/`homepage`/`bugs`/`keywords` metadata, and a bundled `LICENSE` file — the npm package page rendered "This package does not have a README" and `License: none`.
+- Added root `LICENSE` (MIT) plus a copy in `sdk/` so it's included in the published tarball.
+- Added `sdk/README.md` covering install, quick start, and hook overview for the npm package page.
+- `sdk/package.json`: added `license`, `author`, `repository`, `homepage`, `bugs`, `keywords`.
+
+No functional/API changes.
+
+---
+
 ## [1.0.0] — 2026-03-26 — Phase 6: v1.0 Production Ready
 
 ### Breaking Changes
