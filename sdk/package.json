@@ -1,7 +1,26 @@
 {
   "name": "@ghostkey/sdk",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "GhostKey wallet abstraction SDK",
+  "license": "MIT",
+  "author": "GhostKey",
+  "homepage": "https://github.com/OriginalLeeDunn/projekt.ReaperKey#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OriginalLeeDunn/projekt.ReaperKey.git",
+    "directory": "sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/OriginalLeeDunn/projekt.ReaperKey/issues"
+  },
+  "keywords": [
+    "ethereum",
+    "erc-4337",
+    "account-abstraction",
+    "session-keys",
+    "wallet",
+    "web3"
+  ],
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -56,6 +75,6 @@
     "viem": "^2.47.6"
   },
   "overrides": {
-    "ox": "0.14.7"
+    "ox": "0.14.33"
   }
 }
