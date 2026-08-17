@@ -15,6 +15,17 @@ _Nothing unreleased yet._
 
 ---
 
+## [1.0.2] — 2026-08-17 — Release pipeline fix
+
+### Fixed
+- The `v1.0.1` tag's `npm-publish` job actually failed (`npm error E404 — '@ghostkey/sdk@1.0.1' is not in this registry`, almost certainly `NPM_TOKEN` expiring — it hadn't been rotated since the `v1.0.0` release ~5 months earlier). The job still reported green because `npm publish --access public || echo "Version already published, skipping."` swallows *any* publish failure, not just the "already published" case it was written for.
+- `.github/workflows/release.yml`: the `Publish` step now only treats the specific "cannot publish over previously published versions" npm error as non-fatal; every other failure (bad/expired token, network, registry error) now fails the job instead of being silently swallowed.
+- No SDK code changes — version bumped only because `1.0.1` is tied to a tag/release that already exists from the failed attempt; reusing it would mean force-moving a published tag.
+
+**Before tagging `v1.0.2`: `NPM_TOKEN` must be rotated** — generate a new token on npmjs.com and update the `NPM_TOKEN` GitHub Actions secret. This step requires npm account access and isn't something CI or an agent can do.
+
+---
+
 ## [1.0.1] — 2026-08-17 — SDK npm listing fix
 
 ### Fixed
