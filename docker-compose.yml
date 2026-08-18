@@ -21,7 +21,12 @@ services:
       - GHOSTKEY__CHAINS__BASE__CHAIN_ID=${CHAIN_ID:-84532}
       - GHOSTKEY__CHAINS__BASE__ENTRY_POINT=0x0000000071727De22E5E9d8BAf0edAc6f37da032
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      # No wget/curl in the runtime image (debian-slim + just
+      # ca-certificates/libssl3 for the Rust binary) — bash IS present, and
+      # its /dev/tcp pseudo-device can do a real HTTP GET with zero new
+      # image dependencies. CMD (not CMD-SHELL): /bin/sh on Debian is dash,
+      # which doesn't support /dev/tcp, so bash must be invoked directly.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && timeout 3 cat <&3 | grep -q '\"status\":\"ok\"'"]
       interval: 30s
       timeout: 5s
       retries: 3
