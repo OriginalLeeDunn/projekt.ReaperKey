@@ -9,6 +9,8 @@ services:
   dashboard:
     build: .
     container_name: ghostkey-dashboard
+    mem_limit: 768m
+    cpus: "0.75"
     working_dir: /repo/dashboard
     ports:
       - "3002:3002" # frontend (React + Vite)
