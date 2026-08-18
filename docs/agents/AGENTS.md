@@ -51,13 +51,13 @@ System health: `docs/agents/HEALTH.md`
 └─────────────┘  └─────────────────┘  └────────────────────┘
        │
        ▼
-┌─────────────┐
-│  OPERATIONS │
-│             │
-│ - DevOps    │
-│ - Monitor   │
-│ - Docs      │
-└─────────────┘
+┌─────────────┐     ┌────────────────────────────────────────┐
+│  OPERATIONS │     │  DASHBOARD OPERATIONS TEAM             │
+│             │     │  (reports to Governor, runs alongside) │
+│ - DevOps    │     │  - Dashboard Agent (lead)              │
+│ - Monitor   │     │  - Activity Watcher                    │
+│ - Docs      │     │  - Dashboard QA                        │
+└─────────────┘     └────────────────────────────────────────┘
 ```
 
 ---
@@ -148,7 +148,17 @@ Examples:
 | Release Manager    | `agents/ops/RELEASE.md`                | Version tagging, CHANGELOG, GitHub releases |
 | PR Manager         | `agents/ops/PR_MANAGER.md`             | PR creation, standards enforcement           |
 
-**Total active: 22**
+### Dashboard Operations Team
+Dedicated team for the Agent Dashboard (Vite+React app at `:3002`, API server at `:3003`).
+Reports to Governor. Operates alongside the rest of the corp.
+
+| Agent              | File                                        | Domain                                      |
+|--------------------|---------------------------------------------|---------------------------------------------|
+| Dashboard Agent    | `agents/meta/DASHBOARD.md`                  | Lead — frontend, API server, team coord     |
+| Activity Watcher   | `agents/ops/ACTIVITY_WATCHER.md`            | ACTIVITY.log owner, 4-channel routing, SSE  |
+| Dashboard QA       | `agents/ops/DASHBOARD_QA.md`                | Test suite, coverage ≥95%, regression gate  |
+
+**Total active: 25**
 
 ---
 
