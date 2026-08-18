@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import React from 'react'
 import { GhostKeyProvider } from '../src/provider.js'
 import { useLogin } from '../src/hooks/useLogin.js'
+import { useWalletLogin } from '../src/hooks/useWalletLogin.js'
 import { useAccount } from '../src/hooks/useAccount.js'
 import { useSessionKey } from '../src/hooks/useSessionKey.js'
 import { useSendIntent } from '../src/hooks/useSendIntent.js'
@@ -53,6 +54,7 @@ function mockClient(overrides: Partial<GhostKeyClient> = {}): GhostKeyClient {
     setToken: vi.fn(),
     clearToken: vi.fn(),
     login: vi.fn(),
+    fetchWalletNonce: vi.fn(),
     refresh: vi.fn(),
     createAccount: vi.fn(),
     getAccount: vi.fn(),
@@ -160,6 +162,110 @@ describe('useLogin', () => {
     expect(result.current.status).toBe('idle')
     expect(result.current.userId).toBeNull()
     expect(client.clearToken).toHaveBeenCalled()
+  })
+})
+
+// ── useWalletLogin ────────────────────────────────────────────────────────────
+
+function mockEthereum(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    request: vi.fn(async ({ method }: { method: string }) => {
+      if (method === 'eth_requestAccounts') return ['0xAbC1230000000000000000000000000000dEaD']
+      if (method === 'personal_sign') return '0xsignature'
+      throw new Error(`unexpected method: ${method}`)
+    }),
+    ...overrides,
+  }
+}
+
+describe('useWalletLogin', () => {
+  afterEach(() => {
+    // @ts-expect-error test-only cleanup of a global we stub per test
+    delete globalThis.ethereum
+  })
+
+  it('reports wallet_not_found when no injected provider exists', async () => {
+    const client = mockClient()
+    const { result } = renderHook(() => useWalletLogin(), { wrapper: wrapper(client) })
+
+    await act(async () => {
+      await result.current.connect()
+    })
+
+    expect(result.current.error?.code).toBe('wallet_not_found')
+    expect(result.current.address).toBeNull()
+  })
+
+  it('requests accounts, fetches a nonce, signs, and logs in', async () => {
+    const eth = mockEthereum()
+    // @ts-expect-error test-only global stub
+    globalThis.ethereum = eth
+
+    const client = mockClient({
+      fetchWalletNonce: vi.fn().mockResolvedValue({ data: 'test-nonce-123', error: null }),
+      login: vi.fn().mockResolvedValue({
+        data: { userId: 'user-wallet-1', token: 'tok', expiresAt: '2099-01-01' },
+        error: null,
+      }),
+    })
+    const { result } = renderHook(() => useWalletLogin(), { wrapper: wrapper(client) })
+
+    await act(async () => {
+      await result.current.connect()
+    })
+
+    expect(result.current.address).toBe('0xAbC1230000000000000000000000000000dEaD')
+    expect(client.fetchWalletNonce).toHaveBeenCalled()
+
+    // SPEC-100: only a signature request goes to the wallet — never key material
+    expect(eth.request).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'personal_sign' }),
+    )
+
+    // login() must receive the SIWE message (containing the nonce) and the
+    // wallet's signature — never a raw private key.
+    const loginCall = (client.login as ReturnType<typeof vi.fn>).mock.calls[0]
+    expect(loginCall[0]).toBe('wallet')
+    expect(loginCall[1]).toContain('test-nonce-123')
+    expect(loginCall[2]).toBe('0xsignature')
+
+    expect(result.current.status).toBe('authenticated')
+    expect(result.current.userId).toBe('user-wallet-1')
+  })
+
+  it('surfaces the server error when the nonce request fails', async () => {
+    // @ts-expect-error test-only global stub
+    globalThis.ethereum = mockEthereum()
+
+    const client = mockClient({
+      fetchWalletNonce: vi
+        .fn()
+        .mockResolvedValue({ data: null, error: { code: 'rate_limited', message: 'slow down' } }),
+    })
+    const { result } = renderHook(() => useWalletLogin(), { wrapper: wrapper(client) })
+
+    await act(async () => {
+      await result.current.connect()
+    })
+
+    expect(result.current.error?.code).toBe('rate_limited')
+    expect(client.login).not.toHaveBeenCalled()
+  })
+
+  it('sets wallet_not_found if the user rejects the wallet prompt', async () => {
+    // @ts-expect-error test-only global stub
+    globalThis.ethereum = {
+      request: vi.fn().mockRejectedValue(new Error('User rejected the request')),
+    }
+
+    const client = mockClient()
+    const { result } = renderHook(() => useWalletLogin(), { wrapper: wrapper(client) })
+
+    await act(async () => {
+      await result.current.connect()
+    })
+
+    expect(result.current.error?.code).toBe('wallet_not_found')
   })
 })
 

@@ -13,6 +13,12 @@ Updated on every merge to `main`.
 
 ### Added
 - `story/` — interactive, scroll-driven explainer for why GhostKey uses scoped session keys instead of raw wallet keys. Five chapters: the failure mode of an all-or-nothing key, the smart-account/session-key model, an interactive session-key builder, a real client-side key-generation + SHA-256 hashing demo (WebCrypto, no network calls), and a "try to break it" demo that mirrors the real `intent_out_of_scope` / `value_exceeds_session_limit` server error codes. Fully simulated — no wallet, testnet funds, or running server required.
+- **SIWE wallet login** — `method: "wallet"` on `POST /auth/login` is now fully implemented (the `AuthMethod::Wallet` enum variant existed since Phase 1 but was never wired up; the endpoint just hashed whatever string was sent as `credential`, with no signature verification at all).
+  - `GET /auth/wallet/nonce` — single-use, 5-minute nonce, rate-limited per IP, consumed atomically on verification (no separate `used` flag / read-then-write race).
+  - `POST /auth/login` (method = wallet): parses `credential` as a SIWE (EIP-4361) message via the `siwe` crate, checks the nonce was actually issued by this server and not already used, checks the message's `domain` matches the new `server.siwe_domain` config (phishing/cross-site relay protection), checks the message is currently valid (`issued_at`/`expiration`/`not_before`), checks `chain_id` against this deployment's enabled chains, and recovers the signer from `signature` to confirm it matches the address the message claims. A wallet is identified by its lowercased address, same as email is identified by the email address.
+  - New migration `0005_siwe_nonces` (sqlite + postgres).
+  - SDK: `useWalletLogin()` hook — requests accounts from `window.ethereum`, fetches a nonce, builds the SIWE message, requests `personal_sign`, and calls the existing `useLogin` flow. Composes `useLogin` rather than duplicating its state. `buildSiweMessage()` / `toPersonalSignHex()` exported for advanced use.
+  - Server: 7 new integration tests covering the actual security properties — wrong signer rejected, unknown/replayed nonce rejected, wrong domain rejected, no signature material leaked into responses. SDK: unit tests for the hook and the message builder.
 
 ---
 

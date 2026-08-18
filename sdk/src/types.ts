@@ -86,6 +86,8 @@ export type GhostKeyErrorCode =
   | 'session_expired'
   | 'intent_out_of_scope'
   | 'rate_limited'
+  | 'wallet_not_found'
+  | 'invalid_signature'
   | 'unknown'
 
 export interface GhostKeyError {
