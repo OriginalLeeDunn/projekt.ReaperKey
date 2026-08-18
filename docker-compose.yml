@@ -4,6 +4,8 @@ services:
   server:
     build: .
     container_name: ghostkey-server
+    mem_limit: 512m
+    cpus: "0.50"
     ports:
       - "8080:8080"
     volumes:
@@ -41,6 +43,8 @@ services:
       context: .
       dockerfile: example/Dockerfile
     container_name: ghostkey-example
+    mem_limit: 512m
+    cpus: "0.50"
     depends_on:
       - server
     ports:
