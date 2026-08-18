@@ -13,6 +13,7 @@ Updated on every merge to `main`.
 
 ### Added
 - `story/` — interactive, scroll-driven explainer for why GhostKey uses scoped session keys instead of raw wallet keys. Five chapters: the failure mode of an all-or-nothing key, the smart-account/session-key model, an interactive session-key builder, a real client-side key-generation + SHA-256 hashing demo (WebCrypto, no network calls), and a "try to break it" demo that mirrors the real `intent_out_of_scope` / `value_exceeds_session_limit` server error codes. Fully simulated — no wallet, testnet funds, or running server required.
+- `story/`: Chapter 6 — "Your NFT collection, and a 'free mint'". A mock 8-item NFT collection faces a `setApprovalForAll`-style malicious request (the actual mechanism behind most NFT drainer theft, not a hypothetical). Approving with a normal wallet sweeps the entire collection; approving with a GhostKey session key is rejected outright, since "all tokens, forever" can't be expressed in a scope. Includes an explicit "what this doesn't fix" note — this defends against malicious approvals specifically, not account phishing or social engineering, and the chapter says so rather than overselling.
 
 ---
 

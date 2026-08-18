@@ -5,9 +5,19 @@ import Chapter2NewWay from './chapters/Chapter2NewWay'
 import Chapter3ScopedKey from './chapters/Chapter3ScopedKey'
 import Chapter4ProveIt from './chapters/Chapter4ProveIt'
 import Chapter5Reveal from './chapters/Chapter5Reveal'
+import Chapter6NftCollection from './chapters/Chapter6NftCollection'
 import { SCENARIOS, type SessionScope } from './lib/ghost'
 
-const CHAPTER_IDS = ['ch-hero', 'ch-old-way', 'ch-new-way', 'ch-scoped-key', 'ch-prove-it', 'ch-reveal', 'ch-outro']
+const CHAPTER_IDS = [
+  'ch-hero',
+  'ch-old-way',
+  'ch-new-way',
+  'ch-scoped-key',
+  'ch-prove-it',
+  'ch-reveal',
+  'ch-nft-collection',
+  'ch-outro',
+]
 
 export default function App() {
   const [scope, setScope] = useState<SessionScope>({
@@ -40,6 +50,7 @@ export default function App() {
       <Chapter3ScopedKey scope={scope} onChange={setScope} />
       <Chapter4ProveIt onKeyGenerated={() => setKeyReady(true)} />
       <Chapter5Reveal scope={scope} keyReady={keyReady} />
+      <Chapter6NftCollection />
 
       <section id="ch-outro" className="chapter footer-cta">
         <div className="chapter-inner">
