@@ -476,3 +476,109 @@ button.secondary:hover {
   margin-top: 16px;
   font-style: italic;
 }
+
+/* Chapter 6 — NFT collection drainer scenario */
+.nft-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin: 32px 0;
+}
+
+@media (max-width: 560px) {
+  .nft-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.nft-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  position: relative;
+  transition: opacity 0.5s ease, filter 0.5s ease;
+}
+
+.nft-art {
+  aspect-ratio: 1;
+  border-radius: 6px;
+  background: linear-gradient(135deg, hsl(var(--hue) 70% 55%), hsl(calc(var(--hue) + 40) 70% 35%));
+  margin-bottom: 8px;
+}
+
+.nft-name {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.nft-card.nft-drained {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+
+.nft-gone-stamp {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  color: var(--danger);
+  background: rgba(8, 9, 11, 0.55);
+  border-radius: 10px;
+}
+
+.phishing-card {
+  background: linear-gradient(135deg, #2a1a3d, #1a2a3d);
+  border: 1px solid var(--accent-dim);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.phishing-card p {
+  color: var(--text-dim);
+  font-size: 0.92rem;
+  margin-bottom: 14px;
+}
+
+.phishing-badge {
+  display: inline-block;
+  background: linear-gradient(90deg, #ff8a00, #ff2e63);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  margin-bottom: 14px;
+}
+
+.malicious-slip {
+  background: var(--bg-raised);
+  border: 1px solid var(--danger-dim);
+  border-radius: 8px;
+  padding: 16px;
+  font-family: var(--mono);
+  font-size: 13px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 16px;
+}
+
+.malicious-slip dt { color: var(--text-dim); }
+.malicious-slip dd { color: var(--danger); text-align: right; }
+
+.honesty-note {
+  margin-top: 24px;
+  padding: 16px 20px;
+  border-left: 3px solid var(--text-dim);
+  background: var(--bg-raised);
+  border-radius: 0 8px 8px 0;
+  font-size: 0.88rem;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
