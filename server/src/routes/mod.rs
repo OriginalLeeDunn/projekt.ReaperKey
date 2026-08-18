@@ -78,6 +78,7 @@ pub fn build(db: Db, config: Config) -> Router {
         .route("/api/openapi.json", get(openapi_json))
         .route("/health", get(health::check))
         .route("/auth/login", post(auth::login))
+        .route("/auth/wallet/nonce", get(auth::wallet_nonce))
         .route("/auth/refresh", post(auth::refresh))
         .route("/auth/logout", post(auth::logout))
         .route("/account/create", post(account::create))

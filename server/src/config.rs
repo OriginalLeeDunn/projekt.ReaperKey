@@ -24,6 +24,11 @@ pub struct ServerConfig {
     /// Log format: "pretty" (default) or "json" (for production/structured logging).
     #[serde(default = "default_log_format")]
     pub log_format: String,
+    /// Expected `domain` field on incoming SIWE (EIP-4361) sign-in messages —
+    /// must match the frontend origin, not the API host. Rejects messages
+    /// signed for a different site (phishing/relay protection).
+    #[serde(default = "default_siwe_domain")]
+    pub siwe_domain: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -76,6 +81,9 @@ fn default_cors_origins() -> Vec<String> {
 }
 fn default_log_format() -> String {
     "pretty".to_string()
+}
+fn default_siwe_domain() -> String {
+    "localhost:3000".to_string()
 }
 
 fn default_host() -> String {

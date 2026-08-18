@@ -25,7 +25,12 @@ impl DbUser {
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct LoginRequest {
     pub method: AuthMethod,
+    /// Email address (method = email) or the full SIWE message text (method = wallet).
     pub credential: String,
+    /// Required when method = wallet: hex-encoded (0x-prefixed) 65-byte ECDSA
+    /// signature over `credential`. Ignored for method = email.
+    #[serde(default)]
+    pub signature: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, utoipa::ToSchema)]
@@ -54,4 +59,11 @@ pub struct AuthResponse {
     pub user_id: Uuid,
     pub token: String,
     pub expires_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct SiweNonceResponse {
+    /// Single-use, expires in 5 minutes. Embed as the `Nonce:` field of the
+    /// SIWE message the wallet signs.
+    pub nonce: String,
 }

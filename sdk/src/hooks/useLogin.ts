@@ -6,7 +6,7 @@ import { useGhostKey } from '../provider.js'
 export type LoginStatus = 'idle' | 'loading' | 'authenticated' | 'error'
 
 export interface UseLoginReturn {
-  login: (method: AuthMethod, credential: string) => Promise<void>
+  login: (method: AuthMethod, credential: string, signature?: string) => Promise<void>
   logout: () => void
   status: LoginStatus
   userId: string | null
@@ -19,13 +19,14 @@ export function useLogin(): UseLoginReturn {
   const [userId, setUserId] = useState<string | null>(null)
   const [error, setError] = useState<GhostKeyError | null>(null)
 
-  async function login(method: AuthMethod, credential: string): Promise<void> {
+  async function login(method: AuthMethod, credential: string, signature?: string): Promise<void> {
     setStatus('loading')
     setError(null)
 
-    // SPEC-100: private key must never be sent to any network request
-    // Credential here is email/wallet address — not a private key
-    const result = await client.login(method, credential)
+    // SPEC-100: private key must never be sent to any network request.
+    // Credential is email, or (method = wallet) the SIWE message text —
+    // signature is a wallet signature over that text, never key material.
+    const result = await client.login(method, credential, signature)
 
     if (result.error) {
       setStatus('error')
