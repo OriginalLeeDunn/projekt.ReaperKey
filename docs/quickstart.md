@@ -64,6 +64,24 @@ export function LoginButton() {
 }
 ```
 
+**Or sign in with a wallet** (MetaMask or any EIP-1193 provider) via SIWE — no email required:
+
+```tsx
+import { useWalletLogin } from '@ghostkey/sdk'
+
+export function ConnectWalletButton() {
+  const { connect, status, address } = useWalletLogin()
+
+  return (
+    <button onClick={connect} disabled={status === 'loading'}>
+      {status === 'authenticated' ? `Connected: ${address}` : 'Connect Wallet'}
+    </button>
+  )
+}
+```
+
+Requires `server.siwe_domain` in `config.toml` to match your frontend's origin. See [SDK Hook Reference](./sdk/hooks.md#usewalletlogin) and [API Reference](./api/endpoints.md).
+
 ---
 
 ## 4. Create a smart account

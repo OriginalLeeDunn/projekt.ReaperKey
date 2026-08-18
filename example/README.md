@@ -34,6 +34,16 @@ npm run dev
 
 Open http://localhost:3000.
 
+## Run as a container
+
+Runs both this app and the real server together (it depends on one to do anything):
+
+```bash
+JWT_SECRET=... BASE_BUNDLER_URL=... BASE_PAYMASTER_URL=... docker compose up -d server example
+```
+
+Same required secrets as running `server` alone — see the root [`docker-compose.yml`](../docker-compose.yml). Open http://localhost:3000.
+
 ## Environment
 
 The app points to `http://localhost:8080` by default. Override via:

@@ -1,0 +1,12 @@
+name: ghostkey
+
+# Run from anywhere with: docker compose -f story/docker-compose.yml up -d
+# Standalone — fully self-contained, no server/secrets required.
+
+services:
+  story:
+    build: .
+    container_name: ghostkey-story
+    ports:
+      - "3005:3005"
+    restart: unless-stopped

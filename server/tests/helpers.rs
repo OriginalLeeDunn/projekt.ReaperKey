@@ -35,6 +35,7 @@ pub async fn test_server_and_db_with_bundler(
             port: 0,
             cors_origins: vec!["http://localhost:3000".to_string()],
             log_format: "pretty".to_string(),
+            siwe_domain: "localhost:3000".to_string(),
         },
         database: DatabaseConfig {
             url: "sqlite::memory:".to_string(),

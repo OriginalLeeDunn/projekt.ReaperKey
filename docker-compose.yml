@@ -1,8 +1,9 @@
-version: "3.9"
+name: ghostkey
 
 services:
   server:
     build: .
+    container_name: ghostkey-server
     ports:
       - "8080:8080"
     volumes:
@@ -25,6 +26,25 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    restart: unless-stopped
+
+  # Reference app — needs a live server to actually do anything, so it lives
+  # here (alongside `server`) rather than getting its own standalone compose
+  # file the way dashboard/ and story/ do.
+  example:
+    build:
+      context: .
+      dockerfile: example/Dockerfile
+    container_name: ghostkey-example
+    depends_on:
+      - server
+    ports:
+      - "3000:3000"
+    environment:
+      # This ships to the browser, not the container — "server" as a
+      # hostname only resolves inside the compose network, so it has to be
+      # the host-published port (8080:8080 above), not a container hostname.
+      - VITE_API_URL=http://localhost:8080
     restart: unless-stopped
 
 volumes:

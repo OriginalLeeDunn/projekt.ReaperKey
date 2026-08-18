@@ -65,6 +65,60 @@ logout()
 
 ---
 
+## useWalletLogin
+
+Sign in with an injected wallet (MetaMask or any EIP-1193 provider) via
+SIWE (Sign-In with Ethereum, EIP-4361), instead of email. Composes
+`useLogin` internally — `status`/`userId`/session handling are identical
+once the wallet has signed in.
+
+```tsx
+const {
+  connect,   // () => Promise<void>
+  status,    // same LoginStatus as useLogin
+  userId,    // string | null
+  address,   // string | null — the connecting wallet's address
+  error,     // { code: string; message: string } | null
+} = useWalletLogin()
+```
+
+### `connect()`
+
+1. Requests accounts from `window.ethereum` (`eth_requestAccounts`)
+2. Calls `GET /auth/wallet/nonce` for a single-use nonce
+3. Builds a SIWE message and asks the wallet to sign it (`personal_sign`) —
+   the private key never leaves the wallet extension; only a signature is
+   requested
+4. Calls `POST /auth/login` with `method: "wallet"`
+
+```tsx
+import { useWalletLogin } from '@ghostkey/sdk'
+
+function ConnectButton() {
+  const { connect, status, address, error } = useWalletLogin()
+
+  if (status === 'authenticated') return <p>Connected: {address}</p>
+
+  return (
+    <button onClick={connect} disabled={status === 'loading'}>
+      {error ? `Retry (${error.code})` : 'Connect Wallet'}
+    </button>
+  )
+}
+```
+
+No wallet-specific config is required — `connect()` reads `chainId` from
+`<GhostKeyProvider config={{ chainId }}>` and `domain`/`uri` from
+`window.location`. Requires `siwe_domain` on the server to match your
+frontend's origin (see [API reference](../api/endpoints.md)).
+
+### `wallet_not_found` error
+
+Returned when `window.ethereum` doesn't exist, the wallet returns no
+accounts, or the user rejects the connection/signature prompt.
+
+---
+
 ## useAccount
 
 **SPEC-101** — Create and fetch smart account state.
@@ -306,6 +360,8 @@ await initiateRecovery('0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045')
 |------|--------|-------------|
 | `not_authenticated` | hooks | User is not logged in |
 | `invalid_token` | useLogin | Login credentials invalid |
+| `wallet_not_found` | useWalletLogin | No injected wallet, no accounts, or the user rejected the prompt |
+| `invalid_signature` | useWalletLogin | SIWE signature doesn't match the claimed address, or nonce/domain check failed |
 | `session_expired` | useSendIntent | Session key has expired |
 | `intent_out_of_scope` | useSendIntent | Target or selector not allowed |
 | `value_exceeds_session_limit` | useSendIntent | Value exceeds max |

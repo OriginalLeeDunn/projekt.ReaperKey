@@ -23,6 +23,10 @@ port = 8080
 cors_origins = ["http://localhost:3000"]
 # Log format: "pretty" for local dev, "json" for production / log aggregation.
 log_format = "pretty"
+# Expected `domain` field on incoming SIWE (Sign-In with Ethereum) messages —
+# must match your frontend's origin (not this API's host). A signed message
+# for any other domain is rejected.
+siwe_domain = "localhost:3000"
 
 [database]
 url = "sqlite:./db/ghostkey.db"   # SQLite path; sqlite::memory: for ephemeral

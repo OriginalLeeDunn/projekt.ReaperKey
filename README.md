@@ -90,11 +90,18 @@ make dev
 cp .env.example .env
 # Fill in JWT_SECRET, BASE_BUNDLER_URL, BASE_PAYMASTER_URL in .env
 
-docker compose up -d
+docker compose up -d        # server + example reference app (:8080, :3000)
 curl http://localhost:8080/health
 ```
 
 See [`docs/deployment.md`](docs/deployment.md) for the full production deployment guide.
+
+The dashboard and story app run as containers too, each standalone (no secrets needed):
+
+```bash
+docker compose -f dashboard/docker-compose.yml up -d   # :3002 — ops dashboard
+docker compose -f story/docker-compose.yml up -d       # :3005 — "why GhostKey" story
+```
 
 ### Run tests
 
@@ -127,6 +134,7 @@ make ci          # everything (same as CI pipeline)
 │       └── provider.tsx    # React context provider
 ├── db/              # SQLite database directory (db/.gitkeep tracked; *.db gitignored)
 ├── example/         # Reference React app (full 4-step flow)
+├── story/           # Interactive story: why GhostKey uses scoped session keys
 ├── dashboard/       # Agent operations dashboard
 ├── docs/agents/     # AI agent governance system
 │   ├── AGENTS.md    # Master orchestration doc (read first)
