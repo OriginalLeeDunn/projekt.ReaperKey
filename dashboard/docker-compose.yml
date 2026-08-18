@@ -1,4 +1,4 @@
-version: "3.9"
+name: ghostkey
 
 # Run from anywhere with: docker compose -f dashboard/docker-compose.yml up
 # Kept separate from the root docker-compose.yml (the real server) so viewing
@@ -8,6 +8,7 @@ version: "3.9"
 services:
   dashboard:
     build: .
+    container_name: ghostkey-dashboard
     working_dir: /repo/dashboard
     ports:
       - "3002:3002" # frontend (React + Vite)

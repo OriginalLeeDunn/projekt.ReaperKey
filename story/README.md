@@ -28,3 +28,13 @@ npm run dev
 ```
 
 Opens on `http://localhost:3001`.
+
+## Run as a container
+
+Keeps it running persistently instead of starting it by hand each time:
+
+```bash
+docker compose -f story/docker-compose.yml up -d
+```
+
+Opens on `http://localhost:3005`. Fully self-contained — no server, no secrets, no bind mounts (unlike `dashboard/`, this bakes a real production build since there's no live data to reflect).
