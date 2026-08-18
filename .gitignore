@@ -20,6 +20,8 @@ sdk/.turbo/
 sdk/coverage/
 example/node_modules/
 example/dist/
+story/node_modules/
+story/dist/
 *.tsbuildinfo
 
 # ── SQLite databases ─────────────────────────────────────────────────────────

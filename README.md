@@ -127,6 +127,7 @@ make ci          # everything (same as CI pipeline)
 │       └── provider.tsx    # React context provider
 ├── db/              # SQLite database directory (db/.gitkeep tracked; *.db gitignored)
 ├── example/         # Reference React app (full 4-step flow)
+├── story/           # Interactive story: why GhostKey uses scoped session keys
 ├── dashboard/       # Agent operations dashboard
 ├── docs/agents/     # AI agent governance system
 │   ├── AGENTS.md    # Master orchestration doc (read first)
