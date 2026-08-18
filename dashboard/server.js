@@ -291,11 +291,17 @@ app.get('/api/github/releases', (req, res) => ghFetch('/releases?per_page=20', r
 
 // ── Backend health-check proxy ────────────────────────────────────────────────
 app.get('/api/healthcheck', async (req, res) => {
+  // Host defaults to 127.0.0.1 for local `npm run dev` (server runs on the
+  // same machine). In the dashboard's own container, 127.0.0.1 only ever
+  // means the dashboard container itself — the real server is a sibling
+  // container reachable by its Compose service name instead, so this needs
+  // to be overridable (set via BACKEND_HOST in dashboard/docker-compose.yml).
+  const host = process.env.BACKEND_HOST || '127.0.0.1'
   const port = process.env.BACKEND_PORT || 3001
   try {
     const controller = new AbortController()
     const tid = setTimeout(() => controller.abort(), 3000)
-    const r = await fetch(`http://127.0.0.1:${port}/health`, { signal: controller.signal })
+    const r = await fetch(`http://${host}:${port}/health`, { signal: controller.signal })
     clearTimeout(tid)
     const data = await r.json()
     res.json({ ok: r.ok, status: r.status, data })
