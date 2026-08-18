@@ -28,6 +28,15 @@ services:
       # Falls back to your local `gh` auth if you export it yourself, e.g.:
       #   GITHUB_TOKEN=$(gh auth token) docker compose -f dashboard/docker-compose.yml up
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      # Points the "Backend/Health" panel at the real server's container
+      # (name: ghostkey above matches the root docker-compose.yml's project
+      # name, so both land on the same `ghostkey_default` network and can
+      # reach each other by container name — no explicit network/depends_on
+      # needed). 127.0.0.1 would only ever mean this container itself.
+      # Harmless if `server` isn't running — the healthcheck just reports
+      # down, same as today.
+      - BACKEND_HOST=ghostkey-server
+      - BACKEND_PORT=8080
     restart: unless-stopped
 
 volumes:
