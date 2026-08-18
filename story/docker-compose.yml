@@ -7,6 +7,8 @@ services:
   story:
     build: .
     container_name: ghostkey-story
+    mem_limit: 512m
+    cpus: "0.50"
     ports:
       - "3005:3005"
     restart: unless-stopped
