@@ -1,5 +1,8 @@
 # ── Build stage ──────────────────────────────────────────────────────────────
-FROM rust:1.82-bookworm AS builder
+# Floating major-version tag (not a pinned 1.x) so this doesn't go stale the
+# same way it just did: a transitive dependency's manifest now requires the
+# edition2024 Cargo feature, which 1.82 predates and can't even parse.
+FROM rust:1-bookworm AS builder
 
 WORKDIR /build
 
@@ -27,8 +30,15 @@ WORKDIR /app
 COPY --from=builder /build/target/release/ghostkey-server /app/ghostkey-server
 COPY server/migrations /app/migrations
 
-# Non-root user
-RUN useradd -r -u 1001 -s /bin/false ghostkey && chown -R ghostkey:ghostkey /app
+# Non-root user. /data is created (and chowned) here, before VOLUME is
+# declared and before dropping to a non-root user: Docker copies whatever
+# ownership/content already exists at a VOLUME's mount path into the volume
+# on first creation, so this is what makes the volume writable by `ghostkey`
+# instead of defaulting to root-owned (which SQLITE_CANTOPEN's on first run).
+RUN useradd -r -u 1001 -s /bin/false ghostkey \
+    && chown -R ghostkey:ghostkey /app \
+    && mkdir -p /data \
+    && chown ghostkey:ghostkey /data
 USER ghostkey
 
 EXPOSE 8080

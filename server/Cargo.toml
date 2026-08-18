@@ -49,6 +49,9 @@ tokio = { version = "1", features = ["full"] }
 axum-test = "15"
 regex = "1"
 wiremock = "0.6"
+# Additive to the main figment.workspace = true dep — adds Jail (env-var
+# config testing) for test builds only.
+figment = { version = "0.10", features = ["test"] }
 
 # signing test SIWE messages (versions match what `siwe` already pulls in)
 k256 = "0.13"
