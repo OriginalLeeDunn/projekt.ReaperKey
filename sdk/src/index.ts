@@ -1,6 +1,11 @@
 // @ghostkey/sdk — public API surface
 export { GhostKeyProvider } from './provider.js'
 export { useLogin } from './hooks/useLogin.js'
+export type { UseLoginReturn, LoginStatus } from './hooks/useLogin.js'
+export { useWalletLogin } from './hooks/useWalletLogin.js'
+export type { UseWalletLoginReturn } from './hooks/useWalletLogin.js'
+export { buildSiweMessage, toPersonalSignHex } from './siwe.js'
+export type { BuildSiweMessageParams } from './siwe.js'
 export { useAccount } from './hooks/useAccount.js'
 export { useSendIntent } from './hooks/useSendIntent.js'
 export { useSessionKey } from './hooks/useSessionKey.js'

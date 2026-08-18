@@ -10,6 +10,7 @@ use utoipa::OpenApi;
     paths(
         crate::routes::health::check,
         crate::routes::auth::login,
+        crate::routes::auth::wallet_nonce,
         crate::routes::auth::refresh,
         crate::routes::account::create,
         crate::routes::account::fetch,
@@ -24,6 +25,7 @@ use utoipa::OpenApi;
             crate::models::user::AuthMethod,
             crate::models::user::RefreshRequest,
             crate::models::user::AuthResponse,
+            crate::models::user::SiweNonceResponse,
             crate::models::account::CreateAccountRequest,
             crate::models::account::AccountResponse,
             crate::models::session::IssueSessionKeyRequest,

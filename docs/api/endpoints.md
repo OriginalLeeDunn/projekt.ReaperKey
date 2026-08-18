@@ -1,4 +1,4 @@
-KAuthority order for conflict resolution:# GhostKey API Reference
+# GhostKey API Reference
 
 Base URL: configured via `GHOSTKEY__SERVER__HOST` and `GHOSTKEY__SERVER__PORT` (default `http://localhost:8080`)
 
@@ -10,9 +10,9 @@ All endpoints return JSON. Authenticated endpoints require `Authorization: Beare
 
 ### POST /auth/login
 
-Authenticate a user and receive a JWT.
+Authenticate a user and receive a JWT. Two methods are supported.
 
-**Request**
+**Request — email**
 
 ```json
 {
@@ -21,10 +21,29 @@ Authenticate a user and receive a JWT.
 }
 ```
 
+**Request — wallet (SIWE / EIP-4361)**
+
+```json
+{
+  "method": "wallet",
+  "credential": "localhost:3000 wants you to sign in with your Ethereum account:\n0x...\n\nSign in to GhostKey\n\nURI: http://localhost:3000\nVersion: 1\nChain ID: 84532\nNonce: <from GET /auth/wallet/nonce>\nIssued At: 2026-03-26T14:00:00.000Z",
+  "signature": "0x..."
+}
+```
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `method` | string | yes | Authentication method. Currently: `"email"` |
-| `credential` | string | yes | Email address |
+| `method` | string | yes | `"email"` or `"wallet"` |
+| `credential` | string | yes | Email address (`email`) or the full SIWE message text (`wallet`) |
+| `signature` | string | wallet only | Hex-encoded 65-byte ECDSA signature over `credential` |
+
+Wallet login gets its nonce from `GET /auth/wallet/nonce` first — see below. The
+signer address is recovered from the signature and must match the address in
+the message; the message's `domain` must match this server's configured
+`siwe_domain`; the nonce must be one this server issued and not yet used. A
+user is identified by their (lowercased) wallet address, same as email is
+identified by the email address — logging in again with the same wallet
+returns the same `user_id`.
 
 **Response — 201 Created**
 
@@ -40,7 +59,28 @@ Authenticate a user and receive a JWT.
 
 | Status | `error` | Description |
 |--------|---------|-------------|
-| 400 | `invalid_request` | Missing or malformed fields |
+| 400 | `bad_request` | Missing/malformed fields, missing signature, invalid SIWE message, unsupported chain |
+| 401 | `unauthorized` | Signature doesn't match the claimed address, or nonce is invalid/expired/already used, or domain mismatch |
+| 429 | `rate_limited` | Rate limit exceeded (10/60s per IP) |
+
+---
+
+### GET /auth/wallet/nonce
+
+Issue a single-use nonce for SIWE login. Embed the returned value as the
+`Nonce:` field of the message the wallet signs. Expires in 5 minutes;
+consumed on first use — cannot be replayed.
+
+**Response — 200 OK**
+
+```json
+{ "nonce": "3sK9dLp2mQxV8..." }
+```
+
+**Errors**
+
+| Status | `error` | Description |
+|--------|---------|-------------|
 | 429 | `rate_limited` | Rate limit exceeded (10/60s per IP) |
 
 ---

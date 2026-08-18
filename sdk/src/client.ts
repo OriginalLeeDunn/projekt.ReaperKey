@@ -137,10 +137,17 @@ export class GhostKeyClient {
 
   // ── API methods ────────────────────────────────────────────────────────────
 
-  async login(method: string, credential: string): Promise<ApiResult<AuthResponse>> {
-    const res = await this.request<RawAuth>('POST', '/auth/login', { method, credential })
+  async login(method: string, credential: string, signature?: string): Promise<ApiResult<AuthResponse>> {
+    const res = await this.request<RawAuth>('POST', '/auth/login', { method, credential, signature })
     if (res.error) return res
     return { data: this.mapAuth(res.data), error: null }
+  }
+
+  /** GET /auth/wallet/nonce — single-use SIWE nonce, expires in 5 minutes. */
+  async fetchWalletNonce(): Promise<ApiResult<string>> {
+    const res = await this.request<{ nonce: string }>('GET', '/auth/wallet/nonce')
+    if (res.error) return res
+    return { data: res.data.nonce, error: null }
   }
 
   async refresh(token: string): Promise<ApiResult<AuthResponse>> {
